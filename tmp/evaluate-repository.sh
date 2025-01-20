@@ -25,5 +25,5 @@ sonar_scanner_output=$(sonar-scanner \
 
 analysis_id=$(echo "$sonar_scanner_output" | grep -o 'http://localhost:9000/api/ce/task?id=.*')
 
-echo "ANALYSIS_URL: $analysis_id"
+echo "$analysis_id"
 # echo "Sonar Scanner Output: $sonar_scanner_output"
