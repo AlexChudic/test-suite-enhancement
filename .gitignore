@@ -1,4 +1,5 @@
 /data
-/tmp
+tmp/*
+!tmp/evaluate-repository.sh
 .env
 /human-eval
