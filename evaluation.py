@@ -22,8 +22,12 @@ def evaluate_repository():
 def execute_script():
     """Executes a script to evaluate a repository."""
 
+    sonar_token = os.getenv("SONAR_TOKEN")
+    if not sonar_token:
+        raise ValueError("SONAR_TOKEN is not set in environment variables.")
+
     # Command to execute
-    command = ["/bin/bash", "tmp/evaluate-repository.sh", "human-eval/", "sqp_b1741b6c1c9829f4acb358b78273e95ae35b58a9"]
+    command = ["/bin/bash", "tmp/evaluate-repository.sh", "tmp/human-eval/", sonar_token]
 
     try:
         # Run the command and capture the output

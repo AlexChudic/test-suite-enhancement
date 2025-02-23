@@ -20,6 +20,7 @@ sonar_scanner_output=$(sonar-scanner \
   -Dsonar.sources=. \
   -Dsonar.host.url=http://localhost:9000 \
   -Dsonar.token=$sonar_token \
+  -Dsonar.python.coverage.reportPaths=../coverage.xml \
   -Dsonar.java.binaries=.
 )
 
