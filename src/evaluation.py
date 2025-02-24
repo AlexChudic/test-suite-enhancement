@@ -10,7 +10,10 @@ from requests.auth import HTTPBasicAuth
 def evaluate_repository():
     """Evaluates a repository using the SonarQube API."""
     
-    # SonarQube API endpoint
+    # Run test suite evaluation
+    evaluate_test_suite()
+
+    # Run SonarQube evaluation
     task_url = execute_sonarqube_evaluation()
 
     # Wait for the task to finish
@@ -31,11 +34,11 @@ def execute_sonarqube_evaluation():
 
     try:
         # Run the command and capture the output
-        print("Running the evaluation script...")
+        print("Running the src/bash-scripts/evaluate-repository.sh script...")
         result = subprocess.run(command, check=True, text=True, capture_output=True)
 
         # Print the output of the command
-        print("Evaluation script executed successfully!")
+        print("Repository evaluation script executed successfully!")
         print("Analysis URL: ", result.stdout)
 
     except subprocess.CalledProcessError as e:
@@ -106,10 +109,25 @@ def make_get_request(url):
         return None
 
 
-def evaluate_test_csuite():
+def evaluate_test_suite():
     """Evaluates the test suite of a repository."""
 
-    
+    # Command to execute
+    command = ["/bin/bash", "src/bash-scripts/evaluate-test-suite.sh" ]
+
+    try:
+        # Run the command and capture the output
+        print("Running the evaluate-test-suite.sh script...")
+        result = subprocess.run(command, check=True, text=True, capture_output=True)
+
+        # Print the output of the command
+        print("Test suite evaluation script executed successfully!")
+
+    except subprocess.CalledProcessError as e:
+        # Print error details if the command fails
+        print("Error executing command.")
+        print("Exit Code:", e.returncode)
+        print("Error Output:\n", e.stderr)
     
 
 if __name__ == "__main__":
