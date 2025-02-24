@@ -11,7 +11,7 @@ def evaluate_repository():
     """Evaluates a repository using the SonarQube API."""
     
     # SonarQube API endpoint
-    task_url = execute_script()
+    task_url = execute_sonarqube_evaluation()
 
     # Wait for the task to finish
     wait_for_task_to_finish(task_url)
@@ -19,7 +19,7 @@ def evaluate_repository():
     # TODO: Add further evaluation logic
 
 
-def execute_script():
+def execute_sonarqube_evaluation():
     """Executes a script to evaluate a repository."""
 
     sonar_token = os.getenv("SONAR_TOKEN")
@@ -27,7 +27,7 @@ def execute_script():
         raise ValueError("SONAR_TOKEN is not set in environment variables.")
 
     # Command to execute
-    command = ["/bin/bash", "tmp/evaluate-repository.sh", "tmp/human-eval/", sonar_token]
+    command = ["/bin/bash", "src/bash-scripts/evaluate-repository.sh", "tmp/human-eval/", sonar_token]
 
     try:
         # Run the command and capture the output
@@ -105,6 +105,12 @@ def make_get_request(url):
         print(f"Error making GET request: {e}")
         return None
 
+
+def evaluate_test_csuite():
+    """Evaluates the test suite of a repository."""
+
+    
+    
 
 if __name__ == "__main__":
     evaluate_repository()
