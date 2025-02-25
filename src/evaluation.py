@@ -7,9 +7,13 @@ import base64
 from dotenv import load_dotenv
 from requests.auth import HTTPBasicAuth
 
-def evaluate_repository():
+def evaluate_directory(directory_path=None):
     """Evaluates a repository using the SonarQube API."""
     
+    sonar_project_name = os.getenv("SONAR_PROJECT_NAME")
+    if not sonar_project_name:
+        raise ValueError("SONAR_PROJECT_NAME is not set in environment variables.")
+
     # Run test suite evaluation
     evaluate_test_suite()
 
@@ -19,7 +23,20 @@ def evaluate_repository():
     # Wait for the task to finish
     wait_for_task_to_finish(task_url)
 
-    # TODO: Add further evaluation logic
+    # Retrieve the measures from SonarQube
+    if directory_path:
+        directory = "%3A" + directory_path.replace("/", "%2F")
+    else:
+        directory = ""
+    sonar_qube_url = (f"http://localhost:9000/api/measures/component?component={sonar_project_name}{directory}" 
+                      "&metricKeys=code_smells%2Cnew_code_smells%2Clines%2Cnew_lines%2Cncloc%2Cbugs%2Cnew_bugs%2C"
+                      "vulnerabilities%2Cnew_vulnerabilities%2Cnew_maintainability_rating%2Csqale_index%2Ccomplexity%2C"
+                      "cognitive_complexity%2Ccomment_lines")
+    sonar_qube_result = make_get_request(sonar_qube_url)
+    
+    # Print and return the result
+    print("SonarQube Result:\n" + sonar_qube_result)
+    return sonar_qube_result
 
 
 def execute_sonarqube_evaluation():
@@ -29,9 +46,10 @@ def execute_sonarqube_evaluation():
     if not sonar_token:
         raise ValueError("SONAR_TOKEN is not set in environment variables.")
 
+    print(sonar_token)
     # Command to execute
     command = ["/bin/bash", "src/bash-scripts/evaluate-repository.sh", "tmp/human-eval/", sonar_token]
-
+    
     try:
         # Run the command and capture the output
         print("Running the src/bash-scripts/evaluate-repository.sh script...")
@@ -128,7 +146,7 @@ def evaluate_test_suite():
         print("Error executing command.")
         print("Exit Code:", e.returncode)
         print("Error Output:\n", e.stderr)
-    
+
 
 if __name__ == "__main__":
-    evaluate_repository()
+    evaluate_directory()
