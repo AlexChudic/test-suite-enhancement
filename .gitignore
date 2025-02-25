@@ -1,5 +1,5 @@
 /data
 tmp/*
-!tmp/evaluate-repository.sh
+!tmp/tox.ini
 .env
 /human-eval

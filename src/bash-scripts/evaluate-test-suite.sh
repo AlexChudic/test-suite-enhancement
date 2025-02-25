@@ -4,6 +4,14 @@ TMP_DIR="tmp/"
 OLD_REPORTS_DIR="old_reports/"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
+# Check if a path parameter is provided
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <project_name>"
+    exit 1
+fi
+
+project_name=$1
+
 # Check if the tmp directory exists
 if [ ! -d "$TMP_DIR" ]; then
     echo "Error: Directory '$TMP_DIR' does not exist."
@@ -23,7 +31,8 @@ if [ -f "coverage.xml" ]; then
 fi
 
 # Run tox
-echo "Running tox -e py39"
+echo "Running tox -e py39 in $project_name"
+export COV_MODULE=$project_name
 tox -e py39
 
 # Check if coverage.xml has been generated

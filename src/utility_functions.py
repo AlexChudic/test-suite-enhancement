@@ -29,6 +29,6 @@ def delete_python_files(target_path: str):
             os.remove(full_file_path)
 
 
-# if __name__ == "__main__":
-#     copy_python_files("data/human-eval/tests/human-written", "tmp/human-eval/tests/pynguin")
+if __name__ == "__main__":
+    copy_python_files("data/human-eval/tests/human-written", "tmp/human-eval/tests/human-written")
 

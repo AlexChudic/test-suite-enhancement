@@ -7,7 +7,7 @@ import base64
 from dotenv import load_dotenv
 from requests.auth import HTTPBasicAuth
 
-def evaluate_directory(directory_path=None):
+def evaluate_project_directory(project_name, directory_path=None):
     """Evaluates a repository using the SonarQube API."""
     
     sonar_project_name = os.getenv("SONAR_PROJECT_NAME")
@@ -15,10 +15,10 @@ def evaluate_directory(directory_path=None):
         raise ValueError("SONAR_PROJECT_NAME is not set in environment variables.")
 
     # Run test suite evaluation
-    evaluate_test_suite()
+    evaluate_test_suite(project_name)
 
     # Run SonarQube evaluation
-    task_url = execute_sonarqube_evaluation()
+    task_url = execute_sonarqube_evaluation(project_name)
 
     # Wait for the task to finish
     wait_for_task_to_finish(task_url)
@@ -39,7 +39,7 @@ def evaluate_directory(directory_path=None):
     return sonar_qube_result
 
 
-def execute_sonarqube_evaluation():
+def execute_sonarqube_evaluation(project_name):
     """Executes a script to evaluate a repository."""
 
     sonar_token = os.getenv("SONAR_TOKEN")
@@ -48,8 +48,8 @@ def execute_sonarqube_evaluation():
 
     print(sonar_token)
     # Command to execute
-    command = ["/bin/bash", "src/bash-scripts/evaluate-repository.sh", "tmp/human-eval/", sonar_token]
-    
+    command = ["/bin/bash", "src/bash-scripts/evaluate-repository.sh", "tmp/" + project_name + "/" , sonar_token]
+
     try:
         # Run the command and capture the output
         print("Running the src/bash-scripts/evaluate-repository.sh script...")
@@ -127,11 +127,11 @@ def make_get_request(url):
         return None
 
 
-def evaluate_test_suite():
+def evaluate_test_suite(project_name):
     """Evaluates the test suite of a repository."""
 
     # Command to execute
-    command = ["/bin/bash", "src/bash-scripts/evaluate-test-suite.sh" ]
+    command = ["/bin/bash", "src/bash-scripts/evaluate-test-suite.sh", project_name ]
 
     try:
         # Run the command and capture the output
@@ -149,4 +149,4 @@ def evaluate_test_suite():
 
 
 if __name__ == "__main__":
-    evaluate_directory()
+    evaluate_project_directory("human-eval")
