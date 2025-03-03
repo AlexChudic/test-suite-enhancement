@@ -126,7 +126,7 @@ def create_batch_jsonl_file(dataset_path, batch_json_path, model_name=MODEL_NAME
     print("The batch JSONL file has been successfully created.")
 
 
-def submit_batch_job(batch_file_path, batch_job_name):
+def submit_batch_job(batch_file_path):
     """Submits the batch job to OpenAI"""
     batch_file = client.files.create(
         file=open(batch_file_path, "rb"),
@@ -157,14 +157,33 @@ def load_batch_id_from_file(output_path):
             return file.read().strip()
 
 
-def process_batch_results(batch_id, batch_output_dir):
+def process_batch_results(batch_job, batch_output_dir):
     """Fetches and processes batch results"""
-    batch_results = client.batches.get_output(batch_id)
     
-    for item in batch_results.data:
-        response_content = item["choices"][0]["message"]["content"]
-        file_name = f"test_{item['id']}.py"  # Naming based on request ID
-        save_chatgpt_output_to_file(response_content, batch_output_dir, file_name)
+    result_json_path = os.path.join(batch_output_dir, "batch_results.jsonl")
+
+    # Download the results if they don't exist
+    if not os.path.exists(result_json_path):
+        result = client.files.content(batch_job.output_file_id).content
+        with open(result_json_path, "w") as file:
+            file.write(result)
+        print(f"Batch results saved to {result_json_path}")
+
+    else:
+        print ("Results already exist, skipping download")
+
+    results = []
+    with open(result_json_path, "r") as file:
+        for line in file:
+            json_object = json.load(line.strip())
+            results.append(json_object)
+    
+    print(results[0])
+
+    # for item in result.data:
+    #     response_content = item["choices"][0]["message"]["content"]
+    #     file_name = f"test_{item['id']}.py"  # Naming based on request ID
+    #     save_chatgpt_output_to_file(response_content, batch_output_dir, file_name)
 
 
 def get_initial_test_cases_batch(dataset_path):
@@ -180,22 +199,24 @@ def get_initial_test_cases_batch(dataset_path):
         create_batch_jsonl_file(dataset_path, batch_json_path)
     
         print(f"Submitting batch job at {batch_json_path}...")
-        batch_id = submit_batch_job(batch_json_path, BATCH_JOB_NAME)
+        batch_id = submit_batch_job(batch_json_path)
         print(f"Batch job submitted with ID: {batch_id}")
 
         save_batch_id_to_file(batch_id, BATCH_OUTPUT_DIR)
     
+    batch_job = client.batches.retrieve(batch_id)
     
-    batch_result = client.batches.retrieve(batch_id)
-    
-    if batch_result.status == "completed":
+    if batch_job.status == "completed":
         print("Batch job completed. Processing results...")
-        process_batch_results(batch_id, BATCH_OUTPUT_DIR)
-    elif batch_result.status == "cancelled" or batch_result.status == "failed":
-        print(f"Batch job failed with status: {batch_result.status}")
+        process_batch_results(batch_job, BATCH_OUTPUT_DIR)
+    elif batch_job.status == "cancelled" or batch_job.status == "failed":
+        print(f"Batch job failed with status: {batch_job.status}")
 
     else:
         print("Batch job is still in progress. Please check back later.")
+        print(f"Requests completed: {batch_job.request_counts.completed}/{batch_job.request_counts.total}")
+        print(f"Requests failed: {batch_job.request_counts.failed}")
+
 
 
 if __name__ == "__main__":
