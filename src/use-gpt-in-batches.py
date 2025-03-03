@@ -1,11 +1,18 @@
 import json
-from openai import OpenAI
-import pandas as pd
-from dotenv import load_dotenv
 import os
+from openai import OpenAI
+from dotenv import load_dotenv
+import pandas as pd
+import utility_functions as uf
 
-dataset_path = 'tmp/human-eval'
-test_path = 'tmp/human-eval-tests/chatgpt'
+# Setting up the variables
+INPUT_DATASET_PATH = 'tmp/human-eval'
+
+BATCH_JOB_NAME = "unit_test_generation"
+BATCH_OUTPUT_DIR = 'data/human-eval/tests/chatgpt'
+BATCH_JSON_NAME = "batch_requests.jsonl"
+MODEL_NAME = "gpt-4o-mini"
+TEMPERATURE = 0.1
 
 # Load the environment variables
 load_dotenv(override=True)
@@ -15,23 +22,10 @@ client = OpenAI()
 
 # Define the prompt for generating initial unit test cases
 generate_initial_unit_tests_system_prompt = '''
-Your goal is to generate unit tests for a python class. You will be provided with the class definition, and you will output a list of unit test.
+Your goal is to generate unit tests for a python class using the pytest framework. You will be provided with the class definition, and you will output a list of unit test.
 The unit tests should cover the most important methods of the class, reaching a minimum of 80% code coverage.
 Make sure to keep the tests simple and easy to understand. The output should only include the test classes.
 '''
-
-def file_to_multiline_string(file_path):
-    """Reads a Python file and converts its content into a multiline string."""
-    try:
-        with open(file_path, 'r') as file:
-            content = file.read()
-        multiline_string = '"""\n' + content + '\n"""'
-        return multiline_string
-    except FileNotFoundError:
-        return f"Error: The file at {file_path} was not found."
-    except Exception as e:
-        return f"An error occurred: {e}"
-
 
 def get_initial_test_cases(class_unter_test):
     response = client.chat.completions.create(
@@ -52,7 +46,7 @@ def get_initial_test_cases(class_unter_test):
     return response.choices[0].message.content
 
 
-def save_chatgpt_output_to_file(output: str, output_path: str, file_name: str):
+def save_chatgpt_output_to_file(output, output_path, file_name):
     """
     Saves the Python code from a ChatGPT output to a .py file
     Dynamically finds the start and end of the code block marked by ```python and ```
@@ -88,16 +82,121 @@ def save_chatgpt_output_to_file(output: str, output_path: str, file_name: str):
         print(f"An error occurred while saving the file: {e}")
 
 
-def get_initial_test_cases_batch(dataset_path):
+def get_initial_test_cases_batch(dataset_path, output_path=BATCH_OUTPUT_DIR):
     python_files = [f for f in os.listdir(dataset_path) if f.endswith(".py")]
     for file in python_files[:1]:
         file_path = os.path.join(dataset_path, file)
         print(f"Processing file: {file_path}")
-        file_content = file_to_multiline_string(file_path)
+        file_content = uf.file_to_multiline_string(file_path)
         response = get_initial_test_cases(file_content)
         print(f"File {file_path} response:")
         print(response)
-        save_chatgpt_output_to_file(response, test_path, f"test_{file.split('.')[0]}.py")
+        save_chatgpt_output_to_file(response, output_path, f"test_{file.split('.')[0]}.py")
     return response
 
-get_initial_test_cases_batch(dataset_path)
+
+def create_batch_jsonl_file(dataset_path, batch_json_path, model_name=MODEL_NAME, temperature=TEMPERATURE):
+    """Generate a batch JSONL file with prompts from the input dataset."""
+    python_files = [f for f in os.listdir(dataset_path) if f.endswith(".py")]
+    tasks = []
+
+    for file in python_files:
+        custom_id = file.split('.')[0]
+        file_path = os.path.join(dataset_path, file)
+        file_content = uf.file_to_multiline_string(file_path)
+        
+        request = {
+            "custom_id" : custom_id,
+            "method" : "POST",
+            "url" : "/v1/chat/completions",
+            "body" : {
+                "messages": [
+                    {"role": "system", "content": generate_initial_unit_tests_system_prompt},
+                    {"role": "user", "content": file_content}
+                ],
+                "model": model_name,
+                "temperature": temperature
+            }
+        }
+        tasks.append(request)
+
+    with open(batch_json_path, "w") as file:
+        for task in tasks:
+            file.write(json.dumps(task) + "\n")
+    print("The batch JSONL file has been successfully created.")
+
+
+def submit_batch_job(batch_file_path, batch_job_name):
+    """Submits the batch job to OpenAI"""
+    batch_file = client.files.create(
+        file=open(batch_file_path, "rb"),
+        purpose="batch"
+    )
+    print(f"Batch file uploaded with id: {batch_file.id}")
+    batch_job = client.batches.create(
+        input_file_id=batch_file.id,
+        endpoint="/v1/chat/completions",
+        completion_window="24h"
+    )
+    return batch_job.id
+
+
+def save_batch_id_to_file(batch_id, output_path):
+    """Save the batch ID to a file for future reference"""
+    with open(os.path.join(output_path, "batch_id.txt"), "w") as file:
+        file.write(batch_id)
+        print(f"Batch ID ({batch_id}) saved to {output_path}/batch_id.txt")
+
+
+def load_batch_id_from_file(output_path):
+    """Load the batch ID from the file"""
+    if not os.path.exists(os.path.join(output_path, "batch_id.txt")):
+        return None
+    else:
+        with open(os.path.join(output_path, "batch_id.txt"), "r") as file:
+            return file.read().strip()
+
+
+def process_batch_results(batch_id, batch_output_dir):
+    """Fetches and processes batch results"""
+    batch_results = client.batches.get_output(batch_id)
+    
+    for item in batch_results.data:
+        response_content = item["choices"][0]["message"]["content"]
+        file_name = f"test_{item['id']}.py"  # Naming based on request ID
+        save_chatgpt_output_to_file(response_content, batch_output_dir, file_name)
+
+
+def get_initial_test_cases_batch(dataset_path):
+    """Main function to execute batch processing workflow"""
+
+    batch_id = load_batch_id_from_file(BATCH_OUTPUT_DIR)
+    batch_json_path = os.path.join(BATCH_OUTPUT_DIR, BATCH_JSON_NAME)
+    if batch_id:
+        print(f"A batch job is already in progress with batch_id={batch_id}. Checking for results...")
+
+    else:
+        print("Creating JSONL file for batch processing...")
+        create_batch_jsonl_file(dataset_path, batch_json_path)
+    
+        print(f"Submitting batch job at {batch_json_path}...")
+        batch_id = submit_batch_job(batch_json_path, BATCH_JOB_NAME)
+        print(f"Batch job submitted with ID: {batch_id}")
+
+        save_batch_id_to_file(batch_id, BATCH_OUTPUT_DIR)
+    
+    
+    batch_result = client.batches.retrieve(batch_id)
+    
+    if batch_result.status == "completed":
+        print("Batch job completed. Processing results...")
+        process_batch_results(batch_id, BATCH_OUTPUT_DIR)
+    elif batch_result.status == "cancelled" or batch_result.status == "failed":
+        print(f"Batch job failed with status: {batch_result.status}")
+
+    else:
+        print("Batch job is still in progress. Please check back later.")
+
+
+if __name__ == "__main__":
+    get_initial_test_cases_batch(INPUT_DATASET_PATH)

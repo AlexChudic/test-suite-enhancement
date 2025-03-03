@@ -28,6 +28,17 @@ def delete_python_files(target_path: str):
         if os.path.isfile(full_file_path) and file.endswith(".py"):
             os.remove(full_file_path)
 
+def file_to_multiline_string(file_path):
+    """Reads a Python file and converts its content into a multiline string."""
+    try:
+        with open(file_path, 'r') as file:
+            content = file.read()
+        multiline_string = '"""\n' + content + '\n"""'
+        return multiline_string
+    except FileNotFoundError:
+        return f"Error: The file at {file_path} was not found."
+    except Exception as e:
+        return f"An error occurred: {e}"
 
 if __name__ == "__main__":
     copy_python_files("data/human-eval/tests/human-written", "tmp/human-eval/tests/human-written")
