@@ -28,6 +28,11 @@ def delete_python_files(target_path: str):
         if os.path.isfile(full_file_path) and file.endswith(".py"):
             os.remove(full_file_path)
 
+def delete_repository(target_path):
+    """Deletes the specified directory if it exists"""
+    if os.path.exists(target_path):
+        os.rmdir(target_path)
+
 def file_to_multiline_string(file_path):
     """Reads a Python file and converts its content into a multiline string."""
     try:
