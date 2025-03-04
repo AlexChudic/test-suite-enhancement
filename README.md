@@ -9,3 +9,8 @@ In this project, we use a static unit test generation tool Pynguin to compare th
 
 ## Configuration
 TODO add the comands that need to be run
+
+### `python src/evaluation.py`
+Command for running the evaluation part of the pipeline. It first evaluates the test suite coverage and then the repository code quality. It saves the results from the sonarqube scanner to a json on predefined path `data/<project_name>/eval/sonarqube_results.json`.
+- Make sure to extend the PYTHONPATH with the directory where the project is stored. It should be in the form of: `export PYTHONPATH=<path_to_dir>/test-suite-endancement/tmp/<project_name>`
+- The command can then simply be run from root directory as such `python src/evaluation.py`
