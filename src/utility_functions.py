@@ -40,6 +40,23 @@ def file_to_multiline_string(file_path):
     except Exception as e:
         return f"An error occurred: {e}"
 
+def choose_fewshot_example_test_cases(selection_mode, test_dir, num_test_cases=1):
+    if selection_mode == "random":
+        return choose_random_test_cases(test_dir, num_test_cases)
+    elif selection_mode == "problem_similarity":
+        return choose_similar_test_cases(test_dir, num_test_cases)
+    elif selection_mode == "diversity":
+        return choose_diverse_test_cases(test_dir, num_test_cases)
+        
+def choose_random_test_cases():
+    pass
+
+def choose_similar_test_cases():
+    pass
+
+def choose_diverse_test_cases():
+    pass
+
 if __name__ == "__main__":
-    copy_python_files("data/human-eval/tests/human-written", "tmp/human-eval/tests/human-written")
+    copy_python_files("data/human-eval/tests/chatgpt", "tmp/human-eval/tests/chatgpt")
 
