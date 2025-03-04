@@ -4,6 +4,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import pandas as pd
 import utility_functions as uf
+import re
 
 # Setting up the variables
 INPUT_DATASET_PATH = 'tmp/human-eval'
@@ -46,7 +47,12 @@ def get_initial_test_cases(class_unter_test):
     return response.choices[0].message.content
 
 
-def save_chatgpt_output_to_file(output, output_path, file_name):
+def extract_function_name(cleaned_output):
+    match = re.search(r"assert\s+(\w+)\s*\(", cleaned_output)
+    return match.group(1) if match else None
+
+
+def save_chatgpt_output_to_file(output, output_path, module_name):
     """
     Saves the Python code from a ChatGPT output to a .py file
     Dynamically finds the start and end of the code block marked by ```python and ```
@@ -55,8 +61,11 @@ def save_chatgpt_output_to_file(output, output_path, file_name):
         # Find the start and end indices of the Python code block
         start_index = output.index("```python") + len("```python")
         end_index = output.index("```", start_index)
+        file_name = f"test_{module_name}.py"
         
         cleaned_output = output[start_index:end_index].strip()
+        function_name = extract_function_name(cleaned_output)
+        cleaned_output = f"from {module_name} import {function_name}\n" + cleaned_output
         
         # Error handling
         if not cleaned_output:
@@ -91,7 +100,7 @@ def get_initial_test_cases_batch(dataset_path, output_path=BATCH_OUTPUT_DIR):
         response = get_initial_test_cases(file_content)
         print(f"File {file_path} response:")
         print(response)
-        save_chatgpt_output_to_file(response, output_path, f"test_{file.split('.')[0]}.py")
+        save_chatgpt_output_to_file(response, output_path, file.split('.')[0])
     return response
 
 
@@ -165,25 +174,22 @@ def process_batch_results(batch_job, batch_output_dir):
     # Download the results if they don't exist
     if not os.path.exists(result_json_path):
         result = client.files.content(batch_job.output_file_id).content
-        with open(result_json_path, "w") as file:
+        with open(result_json_path, "wb") as file:
             file.write(result)
         print(f"Batch results saved to {result_json_path}")
 
     else:
-        print ("Results already exist, skipping download")
+        print ("Results already exist, skipping download...")
 
     results = []
     with open(result_json_path, "r") as file:
         for line in file:
-            json_object = json.load(line.strip())
+            json_object = json.loads(line.strip())
             results.append(json_object)
-    
-    print(results[0])
 
-    # for item in result.data:
-    #     response_content = item["choices"][0]["message"]["content"]
-    #     file_name = f"test_{item['id']}.py"  # Naming based on request ID
-    #     save_chatgpt_output_to_file(response_content, batch_output_dir, file_name)
+    for res in results:
+        response_content = res['response']['body']["choices"][0]["message"]["content"]
+        save_chatgpt_output_to_file(response_content, batch_output_dir, res['custom_id'])
 
 
 def get_initial_test_cases_batch(dataset_path):
