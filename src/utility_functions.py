@@ -1,5 +1,7 @@
 import os
 import shutil
+import random
+from Levenshtein import distance
 
 def copy_python_files(input_path: str, copy_path: str):
     """
@@ -45,23 +47,53 @@ def file_to_multiline_string(file_path):
     except Exception as e:
         return f"An error occurred: {e}"
 
-def choose_fewshot_example_test_cases(selection_mode, test_dir, num_test_cases=1):
+def get_python_file_content(file_path):
+    """Reads a Python file and returns its content as a string."""
+    try:
+        with open(file_path, 'r') as file:
+            content = file.read()
+        return content
+    except FileNotFoundError:
+        return f"Error: The file at {file_path} was not found."
+    except Exception as e:
+        return f"An error occurred: {e}"
+
+def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test, num_test_cases=1):
+    test_files = [f for f in os.listdir(test_dir) if f.endswith(".py")]
+
+    # CASE 1: Choose test cases randomly
     if selection_mode == "random":
-        return choose_random_test_cases(test_dir, num_test_cases)
-    elif selection_mode == "problem_similarity":
-        return choose_similar_test_cases(test_dir, num_test_cases)
-    elif selection_mode == "diversity":
-        return choose_diverse_test_cases(test_dir, num_test_cases)
-        
-def choose_random_test_cases():
-    pass
+        random_test_cases = []
+        for i in range(num_test_cases):
+            random_test_cases.append(os.path.join(test_dir, random.choice(test_files)))
+        return random_test_cases
+    
+    # CASE 2: Choose test cases based on similarity of the classes
+    elif selection_mode == "class_similarity":
+        class_dir = "/".join(test_dir.split("/")[:-2])
+        class_files = [f for f in os.listdir(class_dir) if f.endswith(".py")]
+        class_similarity_scores = []
+        class_under_test_string = get_python_file_content(os.path.join(class_dir, class_under_test))
 
-def choose_similar_test_cases():
-    pass
+        # Calculate similarity scores between the class under test and all other classes
+        for class_file in class_files:
+            class_file_string = get_python_file_content(os.path.join(class_dir, class_file))
+            class_similarity_scores.append(distance(class_file_string, class_under_test_string))
 
-def choose_diverse_test_cases():
-    pass
+        # Get indexes of the most similar classes
+        most_similar_classes_indexes = sorted(range(len(class_similarity_scores)), key=lambda i: class_similarity_scores[i])[1:num_test_cases+1]
+        most_similar_classes = [os.path.join(test_dir, "test_" + class_files[i]) for i in most_similar_classes_indexes]
+        return most_similar_classes
+    
+    # CASE 3: Choose test cases based on problem natural language similarity
+    # elif selection_mode == "problem_similarity":
+    #     return choose_similar_test_cases(test_dir, num_test_cases)
+
 
 if __name__ == "__main__":
-    copy_python_files("data/human-eval/tests/chatgpt", "tmp/human-eval/tests/chatgpt")
+    # delete_python_files("tmp/human-eval/tests/human-written")
+    # copy_python_files("data/human-eval/tests/human-written", "tmp/human-eval/tests/human-written")
+    chosen_test_cases = choose_fewshot_example_test_cases("class_similarity", "tmp/human-eval/tests/human-written", "HumanEval_0.py", 5)
+    print(chosen_test_cases)
+    pass
 
