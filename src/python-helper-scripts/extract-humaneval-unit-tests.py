@@ -12,6 +12,9 @@ def process_json(file_path=PATH_TO_JSON):
     with open(file_path, "r") as f:
         for line_number, line in enumerate(f, start=1):
             try:
+                # if line_number not in [1, 2, 3, 73, 114]:
+                #     continue
+                
                 # Parse each line as a JSON object
                 data = json.loads(line.strip())
                 
@@ -37,6 +40,7 @@ def process_json(file_path=PATH_TO_JSON):
             except KeyError as e:
                 print(f"Missing key {e} on line {line_number}")
 
+
 def extract_candidate_function(prompt_str):
     """Extracts the function name from the prompt string."""
     match = re.search(r'def (\w+)\(', prompt_str)
@@ -45,24 +49,21 @@ def extract_candidate_function(prompt_str):
 def convert_to_pytest(test_str, candidate_name, module_name):
     """Converts the given test string to a pytest-compatible format."""
     
-    # Extract assertions
-    assertions = re.findall(r'assert candidate(.*?) == (.*?)\n', test_str)
+    lines = test_str.split('\n')
+    start_idx = next((i for i, line in enumerate(lines) if line.strip() == 'def check(candidate):'), -1)
     
-    # Generate test function with parameterization)
-    param_lines = [f"    {args.strip()}, {expected.strip()}" for args, expected in assertions]
-    param_str = ",\n".join(param_lines)
+    if start_idx == -1:
+        raise ValueError("No 'def check(candidate):' found in the input string.")
     
-    return f"""
-import pytest
-from {module_name} import {candidate_name}  # Replace with the actual module
+    test_lines = lines[start_idx + 1:]
+    modified_test_lines = ['    ' + re.sub(r'\bcandidate\b', candidate_name, line) for line in test_lines]
+    
+    new_test_function = ['import pytest', f'from {module_name} import {candidate_name}', '',f'def test_{candidate_name}():'] + modified_test_lines
+    
+    # print("TEST STRING=\n" + test_str + "\n")
+    # print("NEW TEST FUNCTION=\n" + '\n'.join(new_test_function) + "\n")
 
-@pytest.mark.parametrize("inputs, expected", [
-{param_str}
-])
-def test_{candidate_name}(inputs, expected):
-    assert {candidate_name}(*inputs) == expected
-"""
-
+    return '\n'.join(new_test_function)
 
 
 if __name__ == "__main__":
