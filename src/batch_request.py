@@ -294,6 +294,14 @@ class BatchRequest:
             print(f"An error occurred while saving the file: {e}")
 
 
+    def print_batch_tasks_user_prompts(self):
+        """Prints the user prompts for the batch tasks."""
+        with open(self.task_json, "r") as file:
+            for line in file:
+                task = json.loads(line)
+                print(task["body"]["messages"][1]["content"])
+
+
     def to_json(self):
         return {
             "batch_id": self.batch_id,
@@ -306,6 +314,9 @@ class BatchRequest:
             "system_prompt": self.system_prompt,
             "submit_job": self.submit_job
         }
+    
+    def __str__(self):
+        return json.dumps(self.to_json())
 
 
 
