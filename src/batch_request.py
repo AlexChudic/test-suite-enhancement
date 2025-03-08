@@ -103,11 +103,17 @@ class BatchRequest:
             fewshot_example_test_cases = uf.choose_fewshot_example_test_cases(
                 self.identifiers["test_selection_mode"],
                 self.dataset_path,
-                file_name,
+                file_name.removeprefix("test_"),
                 self.identifiers["num_test_cases"]
             )
-            test_cases_content = "\n".join([uf.get_python_file_content(test_case) for test_case in fewshot_example_test_cases])
-            user_prompt = f"{file_content}\n\n{test_cases_content}"
+            test_cases_content = []
+            for test_case in fewshot_example_test_cases:
+                if os.path.exists(test_case):
+                    test_cases_content.append(uf.get_python_file_content(test_case))
+                else:
+                    test_cases_content.append(test_case)
+            test_cases_content = "\n".join(test_cases_content)
+            user_prompt = f"{file_content}\n\nEXAMPLES:\n{test_cases_content}"
             return user_prompt
 
         else:
