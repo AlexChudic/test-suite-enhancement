@@ -72,31 +72,41 @@ def save_batch_requests(batch_requests, batch_file_path=BATCH_REQUESTS_DIR):
             file.write(json.dumps(batch_request.to_json()) + "\n")
 
 
+def continue_processing_batch_requests(client):
+    """Continue processing the batch requests."""
+    batch_requests = load_batch_requests(client=client)
+    for batch_request in batch_requests:
+        batch_request.continue_processing(submit_job=True)
+    save_batch_requests(batch_requests)
+
+
 if __name__ == "__main__":
     # get_initial_test_cases_batch(INPUT_DATASET_PATH)
-    batch_requests = load_batch_requests(client=client)
-    identifiers = {
-        "project_name": "human-eval",
-        "job_type" : "fewshot_test_suite_enhancement",
-        "test_source": "human-written",
-        "test_selection_mode": "random",
-        "num_test_cases": 1,
-        "model_name": "gpt-4o-mini",
-        "temperature": 0.1
-    }
+    # batch_requests = load_batch_requests(client=client)
+    # identifiers = {
+    #     "project_name": "human-eval",
+    #     "job_type" : "fewshot_test_suite_enhancement",
+    #     "test_source": "human-written",
+    #     "test_selection_mode": "random_from_class_under_test",
+    #     "num_test_cases": 2,
+    #     "model_name": "gpt-4o-mini",
+    #     "temperature": 0.1
+    # }
 
-    if batch_exists(identifiers, batch_requests):
-        print("Batch request already exists.")
+    # if batch_exists(identifiers, batch_requests):
+    #     print("Batch request already exists.")
         
-    else:
-        new_batch_request = BatchRequest(
-            "data/human-eval/tests/human-written/enhanced/",
-            "data/human-eval/tests/human-written",
-            generate_new_test_cases_system_prompt,
-            client,
-            identifiers)
-        new_batch_request.print_batch_tasks_user_prompts()
-        batch_requests.append(new_batch_request)
-
-    save_batch_requests(batch_requests)
+    # else:
+    #     new_batch_request = BatchRequest(
+    #         "data/human-eval/tests/human-written/enhanced/",
+    #         "data/human-eval/tests/human-written",
+    #         generate_new_test_cases_system_prompt,
+    #         client,
+    #         identifiers)
+    #     new_batch_request.print_batch_tasks_user_prompts()
+    #     batch_requests.append(new_batch_request)
+    # for batch_request in batch_requests:
+    #     batch_request.check_status()
+    # save_batch_requests(batch_requests)
+    continue_processing_batch_requests(client)
     pass

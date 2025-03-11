@@ -7,9 +7,9 @@ import utility_functions as uf
 BATCH_REQUESTS_DIR="data/batch_requests/"
 
 class BatchRequest:
-    # Constructor for creating a new batch request
-    def __init__(self, output_path, dataset_path, system_prompt, client=None, identifiers={}, 
-                batch_id=None, status="initial", result_json=None, task_json=None, submit_job=False):
+
+    def __init__(self, output_path, dataset_path, system_prompt, client=None, identifiers={}, batch_id=None, status="initial",
+                result_json=None, task_json=None, submit_job=False, is_loaded_form_json=False, corrupted_tests=[]):
         """
         Primary constructor
         
@@ -31,6 +31,7 @@ class BatchRequest:
             system_prompt (str): The system prompt for the ChatGPT model
             task_json (str): The path to the task JSONL file
             result_json (str): The path to the result JSONL
+            is_loaded_form_json (bool): Whether the batch request is loaded from a JSON file or not
         """
         self.client = client
         self.identifiers = identifiers
@@ -42,9 +43,12 @@ class BatchRequest:
         self.system_prompt = system_prompt
         self.task_json = task_json
         self.result_json = result_json
-        print("Batch request created.")
-        print(self.to_json())
-        self.continue_processing()
+        self.corrupted_tests = corrupted_tests
+        if not is_loaded_form_json:
+            print("NEW Batch request created!")
+            print(self.to_json())
+        else:
+            print(f"Batch request loaded from JSON! Batch ID: {self.batch_id}, Status: {self.check_status()}")
         
 
     @classmethod
@@ -59,7 +63,10 @@ class BatchRequest:
             client=client,
             identifiers=batch_data["identifiers"],
             task_json=batch_data["task_json"],
-            result_json=batch_data["result_json"]
+            result_json=batch_data["result_json"],
+            submit_job=batch_data["submit_job"],
+            corrupted_tests=batch_data["corrupted_tests"],
+            is_loaded_form_json=True
         )
 
 
@@ -176,7 +183,7 @@ class BatchRequest:
             )
             self.batch_id = batch_job.id
             self.status = "submitted"
-
+    
 
     def check_status(self):
         """Check the status of the batch job."""
@@ -186,20 +193,17 @@ class BatchRequest:
             return self.status
         
         if not self.client:
-            print("OpenAI client has not been initialized.")
+            print("ERROR: OpenAI client has not been initialized.")
             return self.status
         
         batch_job = self.client.batches.retrieve(self.batch_id)
         self.status = batch_job.status
-        if batch_job.status == "completed":
-            print("Batch job completed. Processing results...")
-        elif batch_job.status == "cancelled" or batch_job.status == "failed":
-            print(f"Batch job failed with status: {batch_job.status}")
 
-        else:
+        if batch_job.status == "in_progress":
             print("Batch job is still in progress. Please check back later.")
             print(f"Requests completed: {batch_job.request_counts.completed}/{batch_job.request_counts.total}")
             print(f"Requests failed: {batch_job.request_counts.failed}")
+
         return self.status
     
 
@@ -267,32 +271,44 @@ class BatchRequest:
             module_name (str): The name of the module under test
         """
         try:
+            if module_name.startswith("test_"):
+                module_name = module_name.removeprefix("test_")
+
             # Find the start and end indices of the Python code block
             start_index = output.index("```python") + len("```python")
-            end_index = output.index("```", start_index)
-            file_name = f"test_{module_name}.py"
-            
-            cleaned_output = output[start_index:end_index].strip()
-            function_name = self.extract_function_name(cleaned_output)
-            cleaned_output = f"from {module_name} import {function_name}\n" + cleaned_output
-            
-            # Error handling
-            if not cleaned_output:
-                raise ValueError("Invalid structure: No valid Python code found in the output.")
-            
-            if not file_name.endswith(".py"):
-                raise ValueError("File name must end with .py extension.")
-            
-            if not os.path.isdir(self.output_path):
-                os.makedirs(self.output_path)
-            
-            full_file_path = os.path.join(self.output_path, file_name)
+            if "```" in output[start_index:]:
+                end_index = output.index("```", start_index)
+                file_name = f"test_{module_name}.py"
+                
+                cleaned_output = output[start_index:end_index].strip()
+                function_name = self.extract_function_name(cleaned_output)
+                cleaned_output = f"from {module_name} import {function_name}\n" + cleaned_output
+                
+                # Error handling
+                if not cleaned_output:
+                    raise ValueError("Invalid structure: No valid Python code found in the output.")
+                
+                if not file_name.endswith(".py"):
+                    raise ValueError("File name must end with .py extension.")
+                
+                if not os.path.isdir(self.output_path):
+                    os.makedirs(self.output_path)
+                
+                full_file_path = os.path.join(self.output_path, file_name)
 
-            # Save the cleaned output to the file
-            with open(full_file_path, "w") as file:
-                file.write(cleaned_output)
+                # Save the cleaned output to the file
+                with open(full_file_path, "w") as file:
+                    file.write(cleaned_output)
+                
+                print(f"Output successfully saved to {file_name}")
+
+            # In case of corrupted LLM output, save the name of the module
+            else:
+                self.corrupted_tests.append(module_name)
+                print("ERROR output:\n" + output)
+                # raise ValueError("Invalid structure: No closing ``` found in the output.")
             
-            print(f"Output successfully saved to {file_name}")
+            
         
         except ValueError as ve:
             raise ve
@@ -318,7 +334,8 @@ class BatchRequest:
             "output_path": self.output_path,
             "dataset_path": self.dataset_path,
             "system_prompt": self.system_prompt,
-            "submit_job": self.submit_job
+            "submit_job": self.submit_job,
+            "corrupted_tests": self.corrupted_tests,
         }
     
     def __str__(self):
