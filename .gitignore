@@ -3,3 +3,5 @@ tmp/*
 !tmp/tox.ini
 .env
 /human-eval
+*/__pycache__
+.scannerwork
