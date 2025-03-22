@@ -39,7 +39,6 @@ Try to draw inspiration from the example unit tests and create new test cases th
 Make sure to keep the tests simple and easy to understand. The output should only include the test classes.
 '''
 
-
 def batch_exists(identifiers, batch_requests: list[BatchRequest]):
     """Check if a batch request with the given identifiers exists."""
     for batch_request in batch_requests:
@@ -81,32 +80,34 @@ def continue_processing_batch_requests(client):
 
 
 if __name__ == "__main__":
-    # get_initial_test_cases_batch(INPUT_DATASET_PATH)
-    # batch_requests = load_batch_requests(client=client)
-    # identifiers = {
-    #     "project_name": "human-eval",
-    #     "job_type" : "fewshot_test_suite_enhancement",
-    #     "test_source": "human-written",
-    #     "test_selection_mode": "random_from_class_under_test",
-    #     "num_test_cases": 2,
-    #     "model_name": "gpt-4o-mini",
-    #     "temperature": 0.1
-    # }
+    batch_requests = load_batch_requests(client=client)
+    
+    identifiers = {
+        "project_name": "human-eval",
+        "job_type" : "fewshot_test_suite_enhancement",
+        "test_source": "chatgpt",
+        "test_selection_mode": "random_from_class_under_test",
+        "num_test_cases": 2,
+        "model_name": "gpt-4o-mini",
+        "temperature": 0.1
+    }
+    if batch_exists(identifiers, batch_requests):
+        print("Batch request already exists.")
+    else:
+        new_batch_request = BatchRequest(
+            "data/human-eval/tests/chatgpt/enhanced/",
+            "data/human-eval/tests/chatgpt",
+            None,
+            client,
+            identifiers)
+        new_batch_request.print_batch_tasks_user_prompts()
+        batch_requests.append(new_batch_request)
 
-    # if batch_exists(identifiers, batch_requests):
-    #     print("Batch request already exists.")
-        
-    # else:
-    #     new_batch_request = BatchRequest(
-    #         "data/human-eval/tests/human-written/enhanced/",
-    #         "data/human-eval/tests/human-written",
-    #         generate_new_test_cases_system_prompt,
-    #         client,
-    #         identifiers)
-    #     new_batch_request.print_batch_tasks_user_prompts()
-    #     batch_requests.append(new_batch_request)
-    # for batch_request in batch_requests:
-    #     batch_request.check_status()
-    # save_batch_requests(batch_requests)
-    continue_processing_batch_requests(client)
+    for batch_request in batch_requests:
+        batch_request.check_status()
+        # batch_request.continue_processing(submit_job=True)
+        # batch_request.print_batch_tasks_user_prompts()
+        # print(f"SYSTEM PROMPT= {batch_request.get_system_prompt()}\n\n")
+
+    save_batch_requests(batch_requests)
     pass

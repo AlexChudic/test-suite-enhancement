@@ -6,9 +6,21 @@ import utility_functions as uf
 
 BATCH_REQUESTS_DIR="data/batch_requests/"
 
+generate_new_test_cases_system_prompt_final = '''
+You are an expert in Python test generation using pytest. Your goal is to generate new high-quality unit tests for a given Python class. You will be provided with the class definition and your output should be a list of new unit tests.
+The prompt will include EXAMPLES of similar test cases to help you generate well-structured test cases.
+Make sure to keep the tests maintainable and easy to understand, while aiming for high code coverage. The output should only include the test classes.
+'''
+
+generate_new_test_cases_system_prompt_final_same_class_examples = '''
+You are an expert in Python test generation using pytest. Your goal is to generate new high-quality unit tests for a given Python class. You will be provided with the class definition and your output should be a list of new unit tests.
+The prompt will include EXAMPLES of existing test classes to help you expand the test suite with well-structured test cases. 
+Make sure to keep the tests maintainable and easy to understand, while aiming for high code coverage. The output should only include the test classes.
+'''
+
 class BatchRequest:
 
-    def __init__(self, output_path, dataset_path, system_prompt, client=None, identifiers={}, batch_id=None, status="initial",
+    def __init__(self, output_path, dataset_path, system_prompt=None, client=None, identifiers={}, batch_id=None, status="initial",
                 result_json=None, task_json=None, submit_job=False, is_loaded_form_json=False, corrupted_tests=[]):
         """
         Primary constructor
@@ -103,14 +115,18 @@ class BatchRequest:
     
 
     def construct_user_prompt(self, file_name):
-        file_path = os.path.join(self.dataset_path, file_name)
-        file_content = uf.file_to_multiline_string(file_path)
+        """Construct the user prompt for the ChatGPT model."""
 
+        # IF fewshot_test_suite_enhancement, use the class under test in the prompt
         if self.identifiers["job_type"] == "fewshot_test_suite_enhancement":
+            mut_name = file_name.removeprefix("test_")
+            mut_dir = os.path.join("tmp", self.identifiers["project_name"])
+            mut_path = os.path.join(mut_dir, mut_name) 
+            mut_content = uf.file_to_multiline_string(mut_path)
             fewshot_example_test_cases = uf.choose_fewshot_example_test_cases(
                 self.identifiers["test_selection_mode"],
                 self.dataset_path,
-                file_name.removeprefix("test_"),
+                mut_name,
                 self.identifiers["num_test_cases"]
             )
             test_cases_content = []
@@ -119,11 +135,19 @@ class BatchRequest:
                     test_cases_content.append(uf.get_python_file_content(test_case))
                 else:
                     test_cases_content.append(test_case)
-            test_cases_content = "\n".join(test_cases_content)
-            user_prompt = f"{file_content}\n\nEXAMPLES:\n{test_cases_content}"
+            test_cases_content = "\n\n".join(test_cases_content)
+            user_prompt = f'''
+# CLASS UNDER TEST: {mut_name}
+{mut_content}
+\n# EXAMPLES:
+{test_cases_content}
+'''
             return user_prompt
-
+        
+        # ELSE use the file content as the prompt - for initial test suite generation
         else:
+            file_path = os.path.join(self.dataset_path, file_name)
+            file_content = uf.file_to_multiline_string(file_path)
             return file_content
 
 
@@ -131,6 +155,8 @@ class BatchRequest:
         """Generate a batch JSONL file with prompts from the input dataset."""
         python_files = [f for f in os.listdir(self.dataset_path) if f.endswith(".py")]
         tasks = []
+
+        system_prompt = self.get_system_prompt()
 
         for file in python_files:
             custom_id = file.split('.')[0]
@@ -142,7 +168,7 @@ class BatchRequest:
                 "url" : "/v1/chat/completions",
                 "body" : {
                     "messages": [
-                        {"role": "system", "content": self.system_prompt},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
                     "model": self.identifiers["model_name"],
@@ -316,12 +342,25 @@ class BatchRequest:
             print(f"An error occurred while saving the file: {e}")
 
 
+    def get_system_prompt(self):
+        if self.system_prompt:
+            return self.system_prompt
+        elif "test_selection_mode" in self.identifiers and self.identifiers["test_selection_mode"] == "random_from_class_under_test":
+            return generate_new_test_cases_system_prompt_final_same_class_examples
+        else:
+            return generate_new_test_cases_system_prompt_final
+
+
     def print_batch_tasks_user_prompts(self):
         """Prints the user prompts for the batch tasks."""
-        with open(self.task_json, "r") as file:
-            for line in file:
-                task = json.loads(line)
-                print(task["body"]["messages"][1]["content"])
+        if not self.task_json:
+            print("Task JSON has not been created yet.")
+        else:
+            with open(self.task_json, "r") as file:
+                for line in file:
+                    task = json.loads(line)
+                    print(task["body"]["messages"][1]["content"])
+                    print("\n\n")
 
 
     def to_json(self):

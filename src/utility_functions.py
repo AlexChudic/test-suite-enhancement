@@ -41,7 +41,7 @@ def file_to_multiline_string(file_path):
     try:
         with open(file_path, 'r') as file:
             content = file.read()
-        multiline_string = '"""\n' + content + '\n"""'
+        multiline_string = content
         return multiline_string
     except FileNotFoundError:
         return f"Error: The file at {file_path} was not found."
@@ -131,8 +131,8 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
 
 
 if __name__ == "__main__":
-    # delete_python_files("tmp/human-eval/tests/human-written")
-    # copy_python_files("data/human-eval/tests/human-written", "tmp/human-eval/tests/human-written")
-    chosen_test_cases = choose_fewshot_example_test_cases("random_from_class_under_test", "data/human-eval/tests/human-written", "HumanEval_6.py", 2)
+    delete_python_files("tmp/human-eval/tests/human-written")
+    copy_python_files("data/human-eval/tests/human-written/enhanced", "tmp/human-eval/tests/human-written")
+    # chosen_test_cases = choose_fewshot_example_test_cases("random_from_class_under_test", "data/human-eval/tests/human-written", "HumanEval_6.py", 2)
     pass
 
