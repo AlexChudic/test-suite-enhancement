@@ -1,7 +1,9 @@
 /data
 tmp/*
 !tmp/tox.ini
+!tmp/correctness-evaluation.py
 .env
 /human-eval
 */__pycache__
 .scannerwork
+report.json

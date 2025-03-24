@@ -305,10 +305,13 @@ class BatchRequest:
             if "```" in output[start_index:]:
                 end_index = output.index("```", start_index)
                 file_name = f"test_{module_name}.py"
-                
                 cleaned_output = output[start_index:end_index].strip()
-                function_name = self.extract_function_name(cleaned_output)
-                cleaned_output = f"from {module_name} import {function_name}\n" + cleaned_output
+                
+                print(f"Module name: {module_name}")
+                print(cleaned_output)
+                print("\n\n")
+                # function_name = self.extract_function_name(cleaned_output)
+                # cleaned_output = f"from {module_name} import {function_name}\n" + cleaned_output
                 
                 # Error handling
                 if not cleaned_output:
