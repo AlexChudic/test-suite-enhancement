@@ -47,17 +47,114 @@ def extract_function_name(cleaned_output):
         return match.group(1) if match else None
 
 
+def add_missing_functino_names(test_class_source_code):
+    print("Applying Rule 1: Adding missing function names...")
+    print("BEFORE")
+    print(test_class_source_code)
+    lines = test_class_source_code.split("\n")
+    imports = "\n".join(line for line in lines if line.startswith("import") or line.startswith("from"))
+    non_imports = [line for line in lines if not (line.startswith("import") or line.startswith("from"))]
+
+    test_functions = []
+    test_counter = 1
+    current_test_lines = []
+    python_raised = False
+    
+    for line in non_imports:
+        stripped_line = line.strip()
+
+        if python_raised:
+            current_test_lines.append(f"    {line}" if not line.startswith("        ") else line)
+            test_functions.append(f"def test_auto_generated_{test_counter}():\n" + "\n".join(current_test_lines) + "\n")
+            test_counter += 1
+            current_test_lines = []
+            python_raised = False
+
+        elif stripped_line.startswith(("assert")):
+            current_test_lines.append(f"    {line}" if not line.startswith("    ") else line)
+            test_functions.append(f"def test_auto_generated_{test_counter}():\n" + "\n".join(current_test_lines) + "\n")
+            test_counter += 1
+            current_test_lines = []
+
+        elif stripped_line.startswith(("with pytest.raises")):
+            python_raised = True
+            current_test_lines.append(f"    {line}" if not line.startswith("    ") else line)
+
+        elif stripped_line:  # Non-empty line (e.g., a comment), keep it in the current test
+            current_test_lines.append(f"    {line}" if not line.startswith("    ") else line)
+
+    # Add the last test function if there's one pending
+    if current_test_lines:
+        test_functions.append(f"def test_auto_generated_{test_counter}():\n" + "\n".join(current_test_lines) + "\n")
+
+    # Create new formatted content
+    test_class_source_code = f"{imports}\n\n" + "\n\n".join(test_functions)
+    print("AFTER")
+    print(test_class_source_code)
+
+
+def remove_self_from_standalone_functions(test_class_source_code, file):
+    lines = test_class_source_code.split('\n')
+    new_lines = []
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+        # Look for function definitions that might have self parameter
+        if line.lstrip().startswith('def ') and '(self' in line:
+            # Handle multi-line function definitions
+            while '):' not in line and i < len(lines) - 1:
+                i += 1
+                line += '\n' + lines[i]
+            
+            # Check if first argument is self
+            if re.match(r'def\s+\w+\s*\(self\b', line):
+                print("Applying Rule 3: Removing self argument from standalone test functions...")
+                print("File: ", file)
+                func_name = re.search(r'def\s+(\w+)', line).group(1)
+                print("Function: ", func_name)
+                
+                # Remove self parameter
+                line = re.sub(r'def\s+(\w+)\s*\(self\s*(?:,\s*)?', r'def \1(', line)
+                line = re.sub(r'def\s+(\w+)\s*\(self\s*\)', r'def \1()', line)
+        
+        new_lines.append(line)
+        i += 1
+    test_class_source_code = '\n'.join(new_lines)
+
+
 def rule_based_repair(test_case_path):
     """Attempts to repair a test case using a rule-based approach."""
 
     with open(test_case_path, "r", encoding="utf-8") as f:
         test_class_source_code = f.read()
 
+    # RULE 1: Add missing function names - only asserts are present
+    has_function = bool(re.search(r"^\s*def test_", test_class_source_code, re.MULTILINE))
+    has_asserts = bool(re.search(r"^\s*(assert|with pytest\.raises)", test_class_source_code, re.MULTILINE))
+
+    if not has_function and has_asserts:
+        add_missing_functino_names(test_class_source_code, test_case_path)
+
+    try :
+        ast.parse(test_class_source_code)
+    except SyntaxError:
+        return "Syntax Error"
+
     function_name = extract_function_name(test_class_source_code)
     module_name = os.path.basename(test_case_path).replace(".py", "").removeprefix("test_")
+
+    # RULE 2: Add missing module import statement
     module_import = f"from {module_name} import {function_name}"
     if module_import not in test_class_source_code:
+        print("Applying Rule 2: Adding missing module import statement...")
         test_class_source_code = module_import + "\n" + test_class_source_code
+
+    # RULE 3: Remove self argument from standalone test functions
+    has_class = bool(re.search(r"class\s+\w+", test_class_source_code))
+    has_self_parameter = bool(re.search(r"def\s+\w+\s*\(self", test_class_source_code))
+    if not has_class and has_self_parameter:
+        remove_self_from_standalone_functions(test_class_source_code, test_case_path)
 
     with open(test_case_path, "w", encoding="utf-8") as f:
         f.write(test_class_source_code)
@@ -174,15 +271,16 @@ def evaluate_functional_correctness(path):
         # Evaluate the test class correctness
         test_class_path = os.path.join(path, test_class)
         res = check_correctness(test_class_path)
-        add_correction_evaluation_stats(stats_pre_repair, res)
+        passed = add_correction_evaluation_stats(stats_pre_repair, res)
 
         # Attempt to repair the test class if failed
-        if res != "Passed":
+        if not passed:
             rule_based_repair(test_class_path)
 
             # Evaluate the test class correctness
             res = check_correctness(test_class_path)
             passed = add_correction_evaluation_stats(stats_post_repair, res)
+
 
             # Remove the tests that are still failing
             if not passed:

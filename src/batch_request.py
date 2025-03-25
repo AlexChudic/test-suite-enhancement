@@ -307,12 +307,6 @@ class BatchRequest:
                 file_name = f"test_{module_name}.py"
                 cleaned_output = output[start_index:end_index].strip()
                 
-                print(f"Module name: {module_name}")
-                print(cleaned_output)
-                print("\n\n")
-                # function_name = self.extract_function_name(cleaned_output)
-                # cleaned_output = f"from {module_name} import {function_name}\n" + cleaned_output
-                
                 # Error handling
                 if not cleaned_output:
                     raise ValueError("Invalid structure: No valid Python code found in the output.")
@@ -329,7 +323,7 @@ class BatchRequest:
                 with open(full_file_path, "w") as file:
                     file.write(cleaned_output)
                 
-                print(f"Output successfully saved to {file_name}")
+                # print(f"Output successfully saved to {file_name}")
 
             # In case of corrupted LLM output, save the name of the module
             else:
@@ -337,8 +331,6 @@ class BatchRequest:
                 print("ERROR output:\n" + output)
                 # raise ValueError("Invalid structure: No closing ``` found in the output.")
             
-            
-        
         except ValueError as ve:
             raise ve
         except Exception as e:
