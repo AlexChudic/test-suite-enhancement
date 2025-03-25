@@ -109,7 +109,7 @@ def remove_self_from_standalone_functions(test_class_source_code, file):
             
             # Check if first argument is self
             if re.match(r'def\s+\w+\s*\(self\b', line):
-                print("Applying Rule 3: Removing self argument from standalone test functions...")
+                print("Applying Rule 5: Removing self argument from standalone test functions...")
                 print("File: ", file)
                 func_name = re.search(r'def\s+(\w+)', line).group(1)
                 print("Function: ", func_name)
@@ -144,13 +144,25 @@ def rule_based_repair(test_case_path):
     function_name = extract_function_name(test_class_source_code)
     module_name = os.path.basename(test_case_path).replace(".py", "").removeprefix("test_")
 
-    # RULE 2: Add missing module import statement
+    # RULE 2: Add missing pytest import
+    pytest_import = "import pytest"
+    if pytest_import not in test_class_source_code:
+        print("Applying Rule 2: Adding missing pytest import...")
+        test_class_source_code = pytest_import + "\n" + test_class_source_code
+
+    # RULE 3: Add missing module import statement
     module_import = f"from {module_name} import {function_name}"
     if module_import not in test_class_source_code:
-        print("Applying Rule 2: Adding missing module import statement...")
+        print("Applying Rule 3: Adding missing module import statement...")
         test_class_source_code = module_import + "\n" + test_class_source_code
 
-    # RULE 3: Remove self argument from standalone test functions
+    # RULE 4: Remove module definition from test class
+    if f"def {function_name}(" in test_class_source_code:
+        print("Applying Rule 4: Removing module definition from test class...")
+
+        test_class_source_code
+
+    # RULE 5: Remove self argument from standalone test functions
     has_class = bool(re.search(r"class\s+\w+", test_class_source_code))
     has_self_parameter = bool(re.search(r"def\s+\w+\s*\(self", test_class_source_code))
     if not has_class and has_self_parameter:
@@ -178,51 +190,48 @@ def get_failing_tests(report_path):
 def remove_failing_tests(test_case_path, res):
     failing_tests = get_failing_tests("report.json")
 
-    with open(test_case_path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-
     print(f"Removing failing tests from the test case... {test_case_path}")
     print(f"Result: {res}")
     print(f"Failing tests: {failing_tests}")
-    print(f"Original test case:")
-    print(lines)
+
+    remove_functions(test_case_path, failing_tests)
+    
+    
+def remove_functions(test_case_path, functions_to_remove):
+    with open(test_case_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
 
     new_lines = []
     skip = False
-    inside_function = False
-
-    for i, line in enumerate(lines):
-        stripped = line.strip()
+    leading_spaces = 0
+    i = -1
+    while i < len(lines)-1:
+        i += 1
+        stripped = lines[i].strip()
 
         # Check if the line starts a failed function
-        if any(f"def {fn}(" in line for fn in failing_tests):
+        if any(f"def {fn}(" in stripped for fn in functions_to_remove):
             skip = True
-            inside_function = True 
+            leading_spaces = lines[i].index(stripped)
             continue 
 
-        # If we're skipping, check if we reached the end of the function
+        # If we're skipping, check if a new function is starting
         if skip:
-            if not inside_function and not stripped.startswith("@"):  # Found a non-decorator, stop skipping
+            if stripped.startswith(("def ", "class ")) and lines[i].index(stripped) == leading_spaces:
+                # Check for function decorator
+                if lines[i-1].strip().startswith(("@", "#")):
+                    new_lines.append(lines[i-1])
                 skip = False
+            else:
                 continue
-
-            if inside_function and not stripped:  # Empty line means function might be ending
-                skip = False
-                continue
-
-            if inside_function and not line.startswith(" ") and not stripped.startswith("@"): # Function ended (non-indented, non-decorator line)
-                skip = False
-                continue
-
-            continue
 
         # If not skipping, keep the line
-        new_lines.append(line)
+        new_lines.append(lines[i])
 
     # Write back cleaned file
     with open(test_case_path, "w") as f:
         f.writelines(new_lines)
-    
+
 
 def add_correction_evaluation_stats(stats, res):    
     stats["total_classes"] += 1
@@ -249,8 +258,6 @@ def add_correction_evaluation_stats(stats, res):
         else:
             return False
 
-            
-
 
 def evaluate_functional_correctness(path):
     test_classes = [f for f in os.listdir(path) if f.endswith(".py")]
@@ -268,6 +275,9 @@ def evaluate_functional_correctness(path):
     stats_post_removal = stats_pre_repair.copy()
     
     for test_class in test_classes:
+        if test_class not in ["test_HumanEval_107.py", "test_HumanEval_158.py"]:
+            continue
+
         # Evaluate the test class correctness
         test_class_path = os.path.join(path, test_class)
         res = check_correctness(test_class_path)
@@ -284,7 +294,11 @@ def evaluate_functional_correctness(path):
 
             # Remove the tests that are still failing
             if not passed:
+                print("REMOVING")
+                print(print_file(test_class_path))
                 remove_failing_tests(test_class_path, res)
+                print("REMOVED")
+                print(print_file(test_class_path))
 
                 # Evaluate the test class correctness again
                 res = check_correctness(test_class_path)
@@ -299,6 +313,12 @@ def evaluate_functional_correctness(path):
 
     print("Functional Correctness Evaluation Results POST REMOVAL:")
     print(json.dumps(stats_post_removal, indent=4))
+
+
+def print_file(path):
+    with open(path, "r", encoding="utf-8") as f:
+        test_class_source_code = f.read()
+        print(test_class_source_code)
 
 if __name__ == "__main__":
     evaluate_functional_correctness("data/human-eval/tests/chatgpt/enhanced")
