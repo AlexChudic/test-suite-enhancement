@@ -102,6 +102,24 @@ def extract_test_cases_from_file(file_path):
     return untabulated_test_cases
         
 
+def get_test_without_problem_definition(file_path):
+    file = get_python_file_content(file_path)
+    parsed_ast = ast.parse(file)
+    for node in ast.walk(parsed_ast):
+        if isinstance(node, ast.FunctionDef):
+            if isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Str):
+                node.body.pop(0)  # Remove the first node if it's a docstring
+    return ast.unparse(parsed_ast)
+
+
+def extract_problem_definition_from_string(file):
+    parsed_ast = ast.parse(file)
+    for node in ast.walk(parsed_ast):
+        if isinstance(node, ast.FunctionDef):
+            return ast.get_docstring(node)
+    return None
+
+
 def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test, num_test_cases=1):
     test_files = [f for f in os.listdir(test_dir) if f.endswith(".py")]
     selected_test_cases = []
@@ -122,13 +140,61 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
     
     # CASE 3: Choose test cases based on problem similarity
     if selection_mode == "problem_similarity":
-        pass
+        class_dir = "/".join(test_dir.split("/")[:-2])
+        class_files = [f for f in os.listdir(class_dir) if f.endswith(".py")]
+        class_similarity_scores = []
+        class_under_test_string = get_python_file_content(os.path.join(class_dir, class_under_test))
+        problem_definition = extract_problem_definition_from_string(class_under_test_string)
+        
+        # Calculate similarity scores between the class under test and all other classes
+        for class_file in class_files:
+            class_file_string = get_python_file_content(os.path.join(class_dir, class_file))
+            class_file_problem_definition = extract_problem_definition_from_string(class_file_string)
+            try:
+                class_similarity_scores.append(distance(class_file_problem_definition, problem_definition))
+            except Exception as e:
+                class_similarity_scores.append(1000)
+                
+        # Get indexes of the most similar classes
+        most_similar_classes_indexes = sorted(range(len(class_similarity_scores)), key=lambda i: class_similarity_scores[i])[1:num_test_cases+1]
+        most_similar_classes = [os.path.join(test_dir, "test_" + class_files[i]) for i in most_similar_classes_indexes]
+        
+        # Extract test cases from the most similar classes
+        test_cases = []
+        for class_file in most_similar_classes:
+            test_cases.extend(extract_test_cases_from_file(class_file))
+
+        n = min(num_test_cases, len(test_cases))
+        selected_test_cases = random.sample(test_cases, k=n)
 
     # CASE 4: Choose test cases based on code similarity - without problem definition
     if selection_mode == "class_similarity_no_definition":
-        pass
+        class_dir = "/".join(test_dir.split("/")[:-2])
+        class_files = [f for f in os.listdir(class_dir) if f.endswith(".py")]
+        class_similarity_scores = []
+        class_under_test_string = get_test_without_problem_definition(os.path.join(class_dir, class_under_test))
+        
+        # Calculate similarity scores between the class under test and all other classes
+        for class_file in class_files:
+            class_file_string = get_test_without_problem_definition(os.path.join(class_dir, class_file))
+            try:
+                class_similarity_scores.append(distance(class_file_string, class_under_test_string))
+            except Exception as e:
+                class_similarity_scores.append(1000)
+                
+        # Get indexes of the most similar classes
+        most_similar_classes_indexes = sorted(range(len(class_similarity_scores)), key=lambda i: class_similarity_scores[i])[1:num_test_cases+1]
+        most_similar_classes = [os.path.join(test_dir, "test_" + class_files[i]) for i in most_similar_classes_indexes]
+        
+        # Extract test cases from the most similar classes
+        test_cases = []
+        for class_file in most_similar_classes:
+            test_cases.extend(extract_test_cases_from_file(class_file))
 
-    # CASE 5: Choose test cases based on problem similarity
+        n = min(num_test_cases, len(test_cases))
+        selected_test_cases = random.sample(test_cases, k=n)
+
+    # CASE 5: Choose test cases based on code similarity with problem definition
     if selection_mode == "class_similarity_with_definition":
         class_dir = "/".join(test_dir.split("/")[:-2])
         class_files = [f for f in os.listdir(class_dir) if f.endswith(".py")]
@@ -143,11 +209,48 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
         # Get indexes of the most similar classes
         most_similar_classes_indexes = sorted(range(len(class_similarity_scores)), key=lambda i: class_similarity_scores[i])[1:num_test_cases+1]
         most_similar_classes = [os.path.join(test_dir, "test_" + class_files[i]) for i in most_similar_classes_indexes]
-        return most_similar_classes
+
+        # Extract test cases from the most similar classes
+        test_cases = []
+        for class_file in most_similar_classes:
+            test_cases.extend(extract_test_cases_from_file(class_file))
+
+        n = min(num_test_cases, len(test_cases))
+        selected_test_cases = random.sample(test_cases, k=n)
         
     # CASE 6: Choose test cases based on similarity of the classes
     if selection_mode == "problem_and_class_similarity":
-        pass
+        class_dir = "/".join(test_dir.split("/")[:-2])
+        class_files = [f for f in os.listdir(class_dir) if f.endswith(".py")]
+        class_similarity_scores = []
+        class_under_test_string = get_python_file_content(os.path.join(class_dir, class_under_test))
+        problem_definition = extract_problem_definition_from_string(class_under_test_string)
+        class_under_test_string = get_test_without_problem_definition(os.path.join(class_dir, class_under_test))
+        
+        # Calculate similarity scores between the class under test and all other classes
+        for class_file in class_files:
+            class_file_string = get_python_file_content(os.path.join(class_dir, class_file))
+            class_file_problem_definition = extract_problem_definition_from_string(class_file_string)
+            class_file_string = get_test_without_problem_definition(os.path.join(class_dir, class_file))
+            score = 0
+            try:
+                score += distance(class_file_problem_definition, problem_definition)
+                score += distance(class_file_string, class_under_test_string)
+            except Exception as e:
+                score = 10000
+            class_similarity_scores.append(score)
+                
+        # Get indexes of the most similar classes
+        most_similar_classes_indexes = sorted(range(len(class_similarity_scores)), key=lambda i: class_similarity_scores[i])[1:num_test_cases+1]
+        most_similar_classes = [os.path.join(test_dir, "test_" + class_files[i]) for i in most_similar_classes_indexes]
+        
+        # Extract test cases from the most similar classes
+        test_cases = []
+        for class_file in most_similar_classes:
+            test_cases.extend(extract_test_cases_from_file(class_file))
+
+        n = min(num_test_cases, len(test_cases))
+        selected_test_cases = random.sample(test_cases, k=n)
 
     return "\n\n".join(selected_test_cases)
 
@@ -155,7 +258,7 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
 if __name__ == "__main__":
     # delete_python_files("tmp/human-eval/tests/human-written")
     # copy_python_files("data/human-eval/tests/chatgpt/enhanced", "tmp/human-eval/tests/chatgpt")
-    chosen_test_cases = choose_fewshot_example_test_cases("random_from_all", "data/human-eval/tests/chatgpt", "HumanEval_11.py", 2)
+    chosen_test_cases = choose_fewshot_example_test_cases("problem_and_class_similarity", "tmp/human-eval/tests/chatgpt", "HumanEval_5.py", 2)
     print(chosen_test_cases)
     pass
 
