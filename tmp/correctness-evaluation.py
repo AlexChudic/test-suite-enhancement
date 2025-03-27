@@ -156,12 +156,6 @@ def rule_based_repair(test_case_path):
         print("Applying Rule 3: Adding missing module import statement...")
         test_class_source_code = module_import + "\n" + test_class_source_code
 
-    # RULE 4: Remove module definition from test class
-    if f"def {function_name}(" in test_class_source_code:
-        print("Applying Rule 4: Removing module definition from test class...")
-
-        test_class_source_code
-
     # RULE 5: Remove self argument from standalone test functions
     has_class = bool(re.search(r"class\s+\w+", test_class_source_code))
     has_self_parameter = bool(re.search(r"def\s+\w+\s*\(self", test_class_source_code))
@@ -275,8 +269,11 @@ def evaluate_functional_correctness(path):
     stats_post_removal = stats_pre_repair.copy()
     
     for test_class in test_classes:
-        if test_class not in ["test_HumanEval_107.py", "test_HumanEval_158.py"]:
-            continue
+        # if test_class not in ["test_HumanEval_107.py", "test_HumanEval_158.py"]:
+        #     continue
+
+        # Ensure the test function is not implemented in the test class
+        remove_test_function_implementation(path, test_class)
 
         # Evaluate the test class correctness
         test_class_path = os.path.join(path, test_class)
@@ -313,6 +310,18 @@ def evaluate_functional_correctness(path):
 
     print("Functional Correctness Evaluation Results POST REMOVAL:")
     print(json.dumps(stats_post_removal, indent=4))
+
+
+def remove_test_function_implementation(path, test_class):
+    with open(os.path.join(path, test_class), "r", encoding="utf-8") as f:
+        test_class_source_code = f.read()
+
+    function_name = extract_function_name(test_class_source_code)
+
+    # RULE 4: Remove module definition from test class
+    if f"def {function_name}(" in test_class_source_code:
+        print("Applying Rule 4: Removing module definition from test class...")
+        remove_functions(path, [function_name])
 
 
 def print_file(path):
