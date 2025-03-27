@@ -90,30 +90,46 @@ def extract_test_cases_from_file(file_path):
                 if isinstance(sub_node, ast.FunctionDef) and sub_node.name.startswith("test_"):
                     test_cases.append(get_source_segment(sub_node))
 
-    return test_cases
+    # if the test case is tabulated, remove the tabs
+    untabulated_test_cases = []
+    for test_case in test_cases:
+        test_case_lines = test_case.split("\n")
+        if test_case_lines[0].startswith("    "):
+            untabulated_test_cases.append("\n".join([line[4:] for line in test_case_lines]))
+        else:
+            untabulated_test_cases.append(test_case)
+
+    return untabulated_test_cases
         
 
 def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test, num_test_cases=1):
     test_files = [f for f in os.listdir(test_dir) if f.endswith(".py")]
+    selected_test_cases = []
 
     # CASE 1: Choose test classes randomly
-    if selection_mode == "random_class":
-        random_test_cases = []
+    if selection_mode == "random_from_all":
         for i in range(num_test_cases):
-            random_test_cases.append(os.path.join(test_dir, random.choice(test_files)))
-        return random_test_cases
+            random_test_file = random.choice(test_files)
+            test_cases = extract_test_cases_from_file(os.path.join(test_dir, random_test_file))
+            selected_test_cases.append( random.choice(test_cases) )
     
-    # CASE 2: Choose test cases based on similarity of the classes
+    # CASE 2: Choose random unit tests from the class under test
     if selection_mode == "random_from_class_under_test":
-        random_test_cases = []
         test_file_path = os.path.join(test_dir, f"test_{class_under_test}")
         test_cases = extract_test_cases_from_file(test_file_path)
-        for i in range(min(num_test_cases, len(test_cases))):
-            random_test_cases.append(random.choice(test_cases))
-        return random_test_cases
+        n = min(num_test_cases, len(test_cases))
+        selected_test_cases = random.sample(test_cases, k=n)
     
-    # CASE 3: Choose test cases based on similarity of the classes
-    elif selection_mode == "class_similarity":
+    # CASE 3: Choose test cases based on problem similarity
+    if selection_mode == "problem_similarity":
+        pass
+
+    # CASE 4: Choose test cases based on code similarity - without problem definition
+    if selection_mode == "class_similarity_no_definition":
+        pass
+
+    # CASE 5: Choose test cases based on problem similarity
+    if selection_mode == "class_similarity_with_definition":
         class_dir = "/".join(test_dir.split("/")[:-2])
         class_files = [f for f in os.listdir(class_dir) if f.endswith(".py")]
         class_similarity_scores = []
@@ -128,11 +144,18 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
         most_similar_classes_indexes = sorted(range(len(class_similarity_scores)), key=lambda i: class_similarity_scores[i])[1:num_test_cases+1]
         most_similar_classes = [os.path.join(test_dir, "test_" + class_files[i]) for i in most_similar_classes_indexes]
         return most_similar_classes
+        
+    # CASE 6: Choose test cases based on similarity of the classes
+    if selection_mode == "problem_and_class_similarity":
+        pass
+
+    return "\n\n".join(selected_test_cases)
 
 
 if __name__ == "__main__":
-    delete_python_files("tmp/human-eval/tests/human-written")
-    copy_python_files("data/human-eval/tests/human-written/enhanced", "tmp/human-eval/tests/human-written")
-    # chosen_test_cases = choose_fewshot_example_test_cases("random_from_class_under_test", "data/human-eval/tests/human-written", "HumanEval_6.py", 2)
+    # delete_python_files("tmp/human-eval/tests/human-written")
+    # copy_python_files("data/human-eval/tests/chatgpt/enhanced", "tmp/human-eval/tests/chatgpt")
+    chosen_test_cases = choose_fewshot_example_test_cases("random_from_all", "data/human-eval/tests/chatgpt", "HumanEval_11.py", 2)
+    print(chosen_test_cases)
     pass
 
