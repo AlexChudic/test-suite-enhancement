@@ -31,10 +31,14 @@ def delete_python_files(target_path: str):
         if os.path.isfile(full_file_path) and file.endswith(".py"):
             os.remove(full_file_path)
 
+
 def delete_repository(target_path):
     """Deletes the specified directory if it exists"""
     if os.path.exists(target_path):
         os.rmdir(target_path)
+
+
+### File Reading and Test Case Extraction Functions ###
 
 def file_to_multiline_string(file_path):
     """Reads a Python file and converts its content into a multiline string."""
@@ -48,6 +52,7 @@ def file_to_multiline_string(file_path):
     except Exception as e:
         return f"An error occurred: {e}"
 
+
 def get_python_file_content(file_path):
     """Reads a Python file and returns its content as a string."""
     try:
@@ -58,6 +63,7 @@ def get_python_file_content(file_path):
         return f"Error: The file at {file_path} was not found."
     except Exception as e:
         return f"An error occurred: {e}"
+
 
 def extract_test_cases_from_file(file_path):
     """Returns the test cases for the specified class."""
@@ -101,6 +107,8 @@ def extract_test_cases_from_file(file_path):
 
     return untabulated_test_cases
         
+
+### Utility functions for Few-shot Example Selection ###
 
 def get_test_without_problem_definition(file_path):
     file = get_python_file_content(file_path)

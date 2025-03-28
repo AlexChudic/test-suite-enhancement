@@ -4,6 +4,7 @@ import json
 import subprocess
 import os
 import base64
+from ..tmp import correctness_evaluation as ce
 from dotenv import load_dotenv
 from requests.auth import HTTPBasicAuth
 from datetime import datetime
@@ -133,27 +134,6 @@ def make_get_request(url):
         return None
 
 
-def evaluate_test_suite(project_name):
-    """Evaluates the test suite of a repository."""
-
-    # Command to execute
-    command = ["/bin/bash", "src/bash-scripts/evaluate-test-suite.sh", project_name ]
-
-    try:
-        # Run the command and capture the output
-        print("Running the evaluate-test-suite.sh script...")
-        result = subprocess.run(command, check=True, text=True, capture_output=True)
-
-        # Print the output of the command
-        print("Test suite evaluation script executed successfully!")
-
-    except subprocess.CalledProcessError as e:
-        # Print error details if the command fails
-        print("Error executing command.")
-        print("Exit Code:", e.returncode)
-        print("Error Output:\n", e.stderr)
-
-
 def format_sonarqube_results(results, project_name, identifiers):
     """Formats the SonarQube results into a more readable format."""
     
@@ -193,8 +173,31 @@ def save_sonarqube_results(results, path):
 
     print("The sonarqube results have been saved to ", path)
 
-        
 
+def evaluate_test_suite(project_name):
+    """Evaluates the test suite of a repository."""
+
+    # Command to execute
+    command = ["/bin/bash", "src/bash-scripts/evaluate-test-suite.sh", project_name ]
+
+    try:
+        # Run the command and capture the output
+        print("Running the evaluate-test-suite.sh script...")
+        result = subprocess.run(command, check=True, text=True, capture_output=True)
+
+        # Print the output of the command
+        print("Test suite evaluation script executed successfully!")
+
+    except subprocess.CalledProcessError as e:
+        # Print error details if the command fails
+        print("Error executing command.")
+        print("Exit Code:", e.returncode)
+        print("Error Output:\n", e.stderr)
+
+        
+def evaluate_test_correctness():
+    """Evaluates the correctness of the test suite."""
+    pass
 
 if __name__ == "__main__":
     evaluate_project_directory("human-eval")

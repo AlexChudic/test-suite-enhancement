@@ -105,7 +105,7 @@ if __name__ == "__main__":
 
     for batch_request in batch_requests:
         batch_request.check_status()
-        # batch_request.continue_processing(submit_job=True)
+        batch_request.continue_processing()
         # batch_request.print_batch_tasks_user_prompts()
         # print(f"SYSTEM PROMPT= {batch_request.get_system_prompt()}\n\n")
 

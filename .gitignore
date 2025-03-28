@@ -2,6 +2,7 @@
 tmp/*
 !tmp/tox.ini
 !tmp/correctness-evaluation.py
+!tmp/correctness_evaluation.py
 .env
 /human-eval
 */__pycache__
