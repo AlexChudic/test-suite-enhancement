@@ -46,8 +46,14 @@ def batch_exists(identifiers, batch_requests: list[BatchRequest]):
             return True
     return False
 
+def get_batch_request(identifiers, batch_requests: list[BatchRequest]):
+    """Get a batch request with the given identifiers."""
+    for batch_request in batch_requests:
+        if batch_request.identifiers == identifiers:
+            return batch_request
+    return None
 
-def load_batch_requests(batch_file_path=BATCH_REQUESTS_DIR, client=None):
+def load_batch_requests(client, batch_file_path=BATCH_REQUESTS_DIR):
     """Load the batch requests from a JSON file."""
     batch_requests = []
     request_json_path = os.path.join(batch_file_path, "batch_requests.jsonl")
