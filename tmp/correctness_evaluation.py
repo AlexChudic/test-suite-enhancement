@@ -47,7 +47,7 @@ def extract_function_name(cleaned_output):
         return match.group(1) if match else None
 
 
-def add_missing_functino_names(test_class_source_code):
+def add_missing_function_names(test_class_source_code):
     print("Applying Rule 1: Adding missing function names...")
     print("BEFORE")
     print(test_class_source_code)
@@ -123,7 +123,7 @@ def remove_self_from_standalone_functions(test_class_source_code, file):
     test_class_source_code = '\n'.join(new_lines)
 
 
-def rule_based_repair(test_case_path):
+def rule_based_repair(test_case_path, test_class, output):
     """Attempts to repair a test case using a rule-based approach."""
 
     with open(test_case_path, "r", encoding="utf-8") as f:
@@ -134,11 +134,13 @@ def rule_based_repair(test_case_path):
     has_asserts = bool(re.search(r"^\s*(assert|with pytest\.raises)", test_class_source_code, re.MULTILINE))
 
     if not has_function and has_asserts:
-        add_missing_functino_names(test_class_source_code, test_case_path)
+        add_missing_function_names(test_class_source_code, test_case_path)
+        output["repair_stats"]["rule_1"].append(test_class)
 
     try :
         ast.parse(test_class_source_code)
     except SyntaxError:
+        output["repair_stats"]["syntax_errors"].append(test_class)
         return "Syntax Error"
 
     function_name = extract_function_name(test_class_source_code)
@@ -149,18 +151,21 @@ def rule_based_repair(test_case_path):
     if pytest_import not in test_class_source_code:
         print("Applying Rule 2: Adding missing pytest import...")
         test_class_source_code = pytest_import + "\n" + test_class_source_code
+        output["repair_stats"]["rule_2"].append(test_class)
 
     # RULE 3: Add missing module import statement
     module_import = f"from {module_name} import {function_name}"
     if module_import not in test_class_source_code:
         print("Applying Rule 3: Adding missing module import statement...")
         test_class_source_code = module_import + "\n" + test_class_source_code
+        output["repair_stats"]["rule_3"].append(test_class)
 
-    # RULE 5: Remove self argument from standalone test functions
+    # RULE 4: Remove self argument from standalone test functions
     has_class = bool(re.search(r"class\s+\w+", test_class_source_code))
     has_self_parameter = bool(re.search(r"def\s+\w+\s*\(self", test_class_source_code))
     if not has_class and has_self_parameter:
         remove_self_from_standalone_functions(test_class_source_code, test_case_path)
+        output["repair_stats"]["rule_4"].append(test_class)
 
     with open(test_case_path, "w", encoding="utf-8") as f:
         f.write(test_class_source_code)
@@ -173,20 +178,45 @@ def get_failing_tests(report_path):
         report = json.load(f)
 
     failed_tests = [
-        test["nodeid"].split("::")[-1]  # Extract function name from nodeid
+        test["nodeid"].split("::")[-1]
         for test in report.get("tests", [])
         if test.get("outcome") == "failed"
     ]
 
     return failed_tests
 
+def get_error_tests(report_path):
+    """Extracts the names of the error tests from a pytest report."""
+    
+    with open(report_path, "r") as f:
+        report = json.load(f)
 
-def remove_failing_tests(test_case_path, res):
+    error_tests = [
+        test["nodeid"].split("::")[-1]
+        for test in report.get("tests", [])
+        if test.get("outcome") == "error"
+    ]
+
+    print(error_tests)
+
+    return error_tests
+
+
+def remove_failing_tests(test_case_path, res, test_class, output):
     failing_tests = get_failing_tests("report.json")
+    error_tests = get_error_tests("report.json")
+
+    if len(failing_tests) > 0:
+        output["repair_stats"]["removed_tests_failing"].append((test_class, len(failing_tests)))
+    if len(error_tests) > 0:
+        output["repair_stats"]["removed_tests_error"].append((test_class, len(error_tests)))
 
     print(f"Removing failing tests from the test case... {test_case_path}")
     print(f"Result: {res}")
     print(f"Failing tests: {failing_tests}")
+    print(f"Error tests: {error_tests}")
+
+    failing_tests += error_tests
 
     remove_functions(test_case_path, failing_tests)
     
@@ -252,8 +282,13 @@ def add_correction_evaluation_stats(stats, res):
         else:
             return False
 
+def optimise_test_suite_effectiveness(test_case_path, test_class, output):
+    """Optimises the test suite effectiveness by removing tests that do not improve coverage."""
 
-def evaluate_functional_correctness(path):
+    pass
+
+
+def evaluate_functional_correctness(path, effectiveness_optimization=False, enhanced_test_suite_path=None):
     test_classes = [f for f in os.listdir(path) if f.endswith(".py")]
     stats_pre_repair = {
         "total_classes": 0,
@@ -267,13 +302,27 @@ def evaluate_functional_correctness(path):
     }
     stats_post_repair = stats_pre_repair.copy()
     stats_post_removal = stats_pre_repair.copy()
-    
+    output = {
+        "repair_stats": {
+            "rule_0": [],
+            "rule_1": [],
+            "rule_2": [],
+            "rule_3": [],
+            "rule_4": [],
+            "rule_5": [],
+            "removed_tests_failing": [],
+            "removed_tests_error": [],
+            "removed_tests_not_improved_coverage": [],
+            "syntax_errors": [],
+        }
+    }
+
     for test_class in test_classes:
         # if test_class not in ["test_HumanEval_107.py", "test_HumanEval_158.py"]:
         #     continue
 
         # Ensure the test function is not implemented in the test class
-        remove_test_function_implementation(path, test_class)
+        remove_test_function_implementation(path, test_class, output)
 
         # Evaluate the test class correctness
         test_class_path = os.path.join(path, test_class)
@@ -282,26 +331,30 @@ def evaluate_functional_correctness(path):
 
         # Attempt to repair the test class if failed
         if not passed:
-            rule_based_repair(test_class_path)
+            rule_based_repair(test_class_path, test_class, output)
 
             # Evaluate the test class correctness
             res = check_correctness(test_class_path)
             passed = add_correction_evaluation_stats(stats_post_repair, res)
 
-
             # Remove the tests that are still failing
             if not passed:
                 print("REMOVING")
                 print(print_file(test_class_path))
-                remove_failing_tests(test_class_path, res)
+                remove_failing_tests(test_class_path, res, test_class, output)
                 print("REMOVED")
                 print(print_file(test_class_path))
 
-                # Evaluate the test class correctness again
-                res = check_correctness(test_class_path)
-                add_correction_evaluation_stats(stats_post_removal, res)
-                
+        # Evaluate the test class correctness again
+        res = check_correctness(test_class_path)
+        add_correction_evaluation_stats(stats_post_removal, res)
+        
+        # Optimize the test suite effectiveness - ONLY works in tmp directory
+        if effectiveness_optimization and enhanced_test_suite_path:
+            enhanced_test_case_path = os.path.join(enhanced_test_suite_path, test_class) 
+            optimise_test_suite_effectiveness(test_class_path, enhanced_test_case_path, test_class, output)
     
+
     print("Functional Correctness Evaluation Results PRE:")
     print(json.dumps(stats_pre_repair, indent=4))
 
@@ -311,17 +364,32 @@ def evaluate_functional_correctness(path):
     print("Functional Correctness Evaluation Results POST REMOVAL:")
     print(json.dumps(stats_post_removal, indent=4))
 
+    if effectiveness_optimization:
+        print("Effectiveness Optimization Results:")
+        # TODO: Print effectiveness optimization results
 
-def remove_test_function_implementation(path, test_class):
+    output["correctness_eval_counts"] = {
+        "stats_pre_repair" : stats_pre_repair,
+        "stats_post_repair" : stats_post_repair, 
+        "stats_post_removal" : stats_post_removal,
+        # TODO: Add effectiveness optimization results
+    }
+
+    return output
+
+
+def remove_test_function_implementation(path, test_class, output):
+    """Removes the test function implementation from the test class."""
     with open(os.path.join(path, test_class), "r", encoding="utf-8") as f:
         test_class_source_code = f.read()
 
     function_name = extract_function_name(test_class_source_code)
 
-    # RULE 4: Remove module definition from test class
+    # RULE 0: Remove module definition from test class
     if f"def {function_name}(" in test_class_source_code:
-        print("Applying Rule 4: Removing module definition from test class...")
+        print("Applying Rule 0: Removing module definition from test class...")
         remove_functions(path, [function_name])
+        output["repair_stats"]["rule_0"].append(test_class)
 
 
 def print_file(path):
@@ -330,4 +398,5 @@ def print_file(path):
         print(test_class_source_code)
 
 if __name__ == "__main__":
-    evaluate_functional_correctness("data/human-eval/tests/chatgpt/enhanced")
+    print("CORRECTNESS EVALUATION RESULTS:")
+    print(evaluate_functional_correctness("data/human-eval/tests/chatgpt/enhanced") )
