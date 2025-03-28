@@ -5,6 +5,7 @@ import re
 import os
 import ast
 import compileall
+from pathlib import Path
 
 def check_correctness(test_case_path):
     """Evaluates the correctness of a test case."""
@@ -282,10 +283,56 @@ def add_correction_evaluation_stats(stats, res):
         else:
             return False
 
-def optimise_test_suite_effectiveness(test_case_path, test_class, output):
-    """Optimises the test suite effectiveness by removing tests that do not improve coverage."""
 
-    pass
+def get_class_under_test_coverage(test_case_path):
+    """Returns the class under test coverage."""
+
+    class_under_test_path = "/".join(test_case_path.split("/")[:2] + [test_case_path.split("/")[-1].replace("test_", "")])
+    tests_dir = "/".join(test_case_path.split("/")[:-1])
+
+    print(tests_dir)
+    print(class_under_test_path)
+    
+    # Verify paths exist
+    if not os.path.exists(class_under_test_path):
+        raise FileNotFoundError(f"Target file not found: {class_under_test_path}")
+    if not os.path.exists(tests_dir):
+        raise FileNotFoundError(f"Tests directory not found: {tests_dir}")
+    
+    # Build the command
+    cmd = [
+        "pytest",
+        f"--cov={class_under_test_path}",
+        "--cov-report=html",
+        "--timeout=5",
+        str(tests_dir)
+    ]
+    
+    try:
+        # Run the command and capture output
+        print("Running pytest to get coverage...")
+        result = subprocess.run(
+            cmd,
+            check=True,
+            text=True,
+            capture_output=True
+        )
+        print(result.stdout)
+        return result.stdout
+    
+    except subprocess.CalledProcessError as e:
+        return f"Error running pytest:\n{e.stdout}\n{e.stderr}"
+    except Exception as e:
+        return f"Unexpected error: {str(e)}"
+
+
+def optimise_test_suite_effectiveness(test_case_path, enhanced_test_case_path, test_class, output):
+    """Optimises the test suite effectiveness by removing tests that do not improve coverage."""
+    # First, get the class under test coverage
+
+    # Next, add the enhance tests one at a time and check if the coverage improves
+
+    pass # TODO: implement this function!!
 
 
 def evaluate_functional_correctness(path, effectiveness_optimization=False, enhanced_test_suite_path=None):
@@ -398,5 +445,7 @@ def print_file(path):
         print(test_class_source_code)
 
 if __name__ == "__main__":
-    print("CORRECTNESS EVALUATION RESULTS:")
-    print(evaluate_functional_correctness("data/human-eval/tests/chatgpt/enhanced") )
+    # print("CORRECTNESS EVALUATION RESULTS:")
+    # print(evaluate_functional_correctness("data/human-eval/tests/chatgpt/enhanced") )
+
+    get_class_under_test_coverage("tmp/human-eval/tests/chatgpt/test_HumanEval_107.py")
