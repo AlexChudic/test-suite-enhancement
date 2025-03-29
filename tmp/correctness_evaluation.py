@@ -299,7 +299,7 @@ def add_correction_evaluation_stats(stats, res):
             return False
 
 
-def get_class_under_test_coverage(test_case_path):
+def get_class_under_test_coverage_metrics(test_case_path):
     """Returns the class under test coverage."""
 
     module_under_test_name = test_case_path.split("/")[-1].replace("test_", "").replace(".py", "")
@@ -318,22 +318,35 @@ def get_class_under_test_coverage(test_case_path):
     cmd = [
         "pytest",
         f"--cov={module_under_test_name}",
-        "--cov-report=term",
+        "--cov-report=json",
         "--timeout=5",
         str(tests_dir)
     ]
     
     try:
         # Run the command and capture output
-        print("Running pytest to get coverage...")
         result = subprocess.run(
             cmd,
             check=True,
             text=True,
             capture_output=True
         )
-        print(result.stdout)
-        return result.stdout
+        
+        # Get the coverage metrics from the json report
+        if not os.path.exists("coverage.json"):
+            raise FileNotFoundError("Coverage report not found: coverage.json")
+        
+        with open("coverage.json", "r") as f:
+            coverage_report = json.load(f)
+
+        file_metrics = coverage_report["files"][0]
+        coverage_metrics = {
+            "covered_lines": file_metrics["summary"]["covered_lines"],
+            "num_statements": file_metrics["summary"]["num_statements"],
+            "percent_covered": file_metrics["summary"]["percent_covered"],
+            "missing_lines": file_metrics["summary"]["missing_lines"],
+        }
+        return coverage_metrics
     
     except subprocess.CalledProcessError as e:
         return f"Error running pytest:\n{e.stdout}\n{e.stderr}"
@@ -461,4 +474,4 @@ if __name__ == "__main__":
     # print("CORRECTNESS EVALUATION RESULTS:")
     # print(evaluate_functional_correctness("data/human-eval/tests/chatgpt/enhanced") )
 
-    get_class_under_test_coverage("tmp/human_eval/tests/chatgpt/test_HumanEval_107.py")
+    get_class_under_test_coverage_metrics("tmp/human_eval/tests/chatgpt/test_HumanEval_107.py")
