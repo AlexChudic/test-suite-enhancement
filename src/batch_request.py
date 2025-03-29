@@ -2,7 +2,7 @@ import json
 import os
 import re
 from openai import OpenAI
-import utility_functions as uf
+import src.utility_functions as uf
 
 BATCH_REQUESTS_DIR="data/batch_requests/"
 

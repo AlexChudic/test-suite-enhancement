@@ -3,9 +3,8 @@ import os
 from openai import OpenAI
 from dotenv import load_dotenv
 import pandas as pd
-import utility_functions as uf
-from batch_request import BatchRequest
-import batch_request as br
+import src.utility_functions as uf
+from src.batch_request import BatchRequest
 import re
 
 BATCH_REQUESTS_DIR="data/batch_requests/"

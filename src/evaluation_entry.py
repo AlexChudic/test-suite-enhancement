@@ -1,6 +1,6 @@
 import json
 import os
-import utility_functions as uf
+import src.utility_functions as uf
 from datetime import datetime
 
 EVALUATION_DIR="data/eval/"

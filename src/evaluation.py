@@ -4,7 +4,7 @@ import json
 import subprocess
 import os
 import base64
-from ..tmp import correctness_evaluation as ce
+import tmp.correctness_evaluation as correctness_evaluation
 from dotenv import load_dotenv
 from requests.auth import HTTPBasicAuth
 from datetime import datetime

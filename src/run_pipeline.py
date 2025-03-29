@@ -1,8 +1,9 @@
-import evaluation as ev
-import utility_functions as uf
-import use_gpt_in_batches as use_gpt
-from batch_request import BatchRequest
-from evaluation_entry import EvaluationEntry
+import src.evaluation as ev
+import src.utility_functions as utility
+import src.use_gpt_in_batches as use_gpt
+from src.batch_request import BatchRequest
+from src.evaluation_entry import EvaluationEntry
+import tmp.correctness_evaluation as correctness_evaluation
 import json
 import os
 from openai import OpenAI
@@ -21,18 +22,18 @@ def run_initial_project_evaluations(project_name):
     
     for test_source in ["human-written", "pynguin", "chatgpt"]:
         print(f"Running initial evaluations for project: {project_name} with test source: {test_source}\n")
-        uf.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
+        utility.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
         ev.evaluate_project_directory(project_name, identifiers={"ctx": "initial", "test_source": test_source, "target": "full_repository"})
         ev.evaluate_project_directory(project_name, identifiers={"ctx": "initial", "test_source": test_source, "target": "tests"}, directory_path=f"tests/{test_source}")
-        uf.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
-        uf.delete_repository(f"tmp/{project_name}/tests/{test_source}")
+        utility.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
+        utility.delete_repository(f"tmp/{project_name}/tests/{test_source}")
         
         
 def run_specific_project_evaluation(project_name, ctx):
     print(f"Running specific evaluations for project: {project_name}\n")
 
     if ctx["test_source"]:
-        uf.copy_python_files(f"data/{project_name}/tests/{ctx['test_source']}", f"tmp/{project_name}/tests/{ctx['test_source']}")
+        utility.copy_python_files(f"data/{project_name}/tests/{ctx['test_source']}", f"tmp/{project_name}/tests/{ctx['test_source']}")
 
     if ctx["target"] == "tests":
         ev.evaluate_project_directory(project_name, identifiers=ctx, directory_path=f"tests/{ctx['test_source']}")
@@ -40,9 +41,19 @@ def run_specific_project_evaluation(project_name, ctx):
         ev.evaluate_project_directory(project_name, identifiers=ctx)
 
     if ctx["test_source"]:
-        uf.delete_python_files(f"tmp/{project_name}/tests/{ctx['test_source']}")
-        uf.delete_repository(f"tmp/{project_name}/tests/{ctx['test_source']}")
+        utility.delete_python_files(f"tmp/{project_name}/tests/{ctx['test_source']}")
+        utility.delete_repository(f"tmp/{project_name}/tests/{ctx['test_source']}")
 
+
+def ensure_initial_test_suite_correctness(project_name, test_source):
+    """Ensure the initial test suite is correct - if not, apply rule-based repair"""
+    test_suite_path = f"data/{project_name}/tests/{test_source}"
+    res = correctness_evaluation.evaluate_functional_correctness(test_suite_path)
+
+    with open(f"data/{project_name}/tests/{test_source}/correctness_evaluation.json", "w") as file:
+        json.dump(res, file, indent=4)
+    
+    return res
 
 def run_single_eval_setting():
     # STEP 1: Run the test correctness evaluation
@@ -93,8 +104,7 @@ def run_full_pipeline(project_name):
                         client,
                         identifiers
                     )
-
-                    batch_requests.continue_processing(submit_job=False) # Change to True when everything is ready!
+                    new_batch_request.continue_processing(submit_job=False) # Change to True when everything is ready!
                     batch_requests.append(new_batch_request)
                     use_gpt.save_batch_requests(batch_requests)
                 else:
@@ -122,4 +132,6 @@ def run_full_pipeline(project_name):
                         
 
 if __name__ == "__main__":
-    run_specific_project_evaluation("human-eval", {"ctx": "initial", "test_source": "human-written", "target": "full_repository"})
+    # run_specific_project_evaluation("human-eval", {"ctx": "initial", "test_source": "human-written", "target": "full_repository"})
+
+    ensure_initial_test_suite_correctness("human-eval", "chatgpt")

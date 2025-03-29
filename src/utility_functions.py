@@ -265,8 +265,7 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
 
 if __name__ == "__main__":
     # delete_python_files("tmp/human-eval/tests/human-written")
-    # copy_python_files("data/human-eval/tests/chatgpt/enhanced", "tmp/human-eval/tests/chatgpt")
-    chosen_test_cases = choose_fewshot_example_test_cases("problem_and_class_similarity", "tmp/human-eval/tests/chatgpt", "HumanEval_5.py", 2)
-    print(chosen_test_cases)
+    copy_python_files("data/human-eval/tests/chatgpt", "tmp/human-eval/tests/chatgpt")
+    # chosen_test_cases = choose_fewshot_example_test_cases("problem_and_class_similarity", "tmp/human-eval/tests/chatgpt", "HumanEval_5.py", 2)
     pass
 
