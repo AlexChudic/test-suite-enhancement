@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
-PATH_TO_JSON = "data/human-eval/human-eval-dataset.jsonl" # Needs to be executed from root directory
+PATH_TO_JSON = "data/human_eval/human-eval-dataset.jsonl" # Needs to be executed from root directory
+OUTPUT_DIR = "data/human_eval/tests/human_written"
 
 def process_json(file_path=PATH_TO_JSON):
     """Reads the JSON file, extracts the test node, and converts it to pytest format."""
@@ -27,9 +28,7 @@ def process_json(file_path=PATH_TO_JSON):
                 pytest_code = convert_to_pytest(test_code, candidate_name, task_id)
                 
                 # Craft the output path
-                output_path = file_path.split("/")[:-1]
-                output_path.append("tests")
-                output_path.append("human-written")
+                output_path = OUTPUT_DIR.split("/")
                 output_path.append("test_" + task_id + ".py")
                 output_path = "/".join(output_path)
                 with open(output_path, 'w', encoding='utf-8') as f:
