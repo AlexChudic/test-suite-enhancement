@@ -55,6 +55,7 @@ def ensure_initial_test_suite_correctness(project_name, test_source):
     
     return res
 
+
 def run_single_eval_setting():
     # STEP 1: Run the test correctness evaluation
         # Ensure the tests are working correctly
@@ -74,12 +75,15 @@ def run_full_pipeline(project_name):
     client = OpenAI()
     batch_requests = use_gpt.load_batch_requests(client)
 
-    sources = ["human-written", "pynguin", "chatgpt"]
+    sources = ["human_written"] #, "pynguin", "chatgpt"]
     example_selection_modes = ["random_from_all", "random_from_class_under_test", "problem_similarity", "class_similarity_no_definition", 
                                "class_similarity_with_definition", "problem_and_class_similarity"]
     num_test_cases = [1, 3, 5]
 
     for test_source in sources:
+        # Copy the test files to a temporary directory
+        utility.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
+
         for example_selection_mode in example_selection_modes:
             for num_test_case in num_test_cases:
                 identifiers = {
@@ -99,7 +103,7 @@ def run_full_pipeline(project_name):
                     # If batch does not exist, create a new one
                     new_batch_request = BatchRequest(
                         f"data/{project_name}/tests/{test_source}/enhanced/",
-                        f"data/{project_name}/tests/{test_source}",
+                        f"tmp/{project_name}/tests/{test_source}",
                         None,
                         client,
                         identifiers
@@ -108,6 +112,7 @@ def run_full_pipeline(project_name):
                     batch_requests.append(new_batch_request)
                     use_gpt.save_batch_requests(batch_requests)
                 else:
+                    batch.continue_processing(submit_job=True)
                     batch_status = batch.check_status()
                     
                     # If the batch is completed, continue processing - extract the results
@@ -121,17 +126,25 @@ def run_full_pipeline(project_name):
 
                     else:
                         print(f"Batch request is not processed yet. Status: {batch_status}")
+                    use_gpt.save_batch_requests(batch_requests)
 
                 # If batch is processed, run the specific project evaluation
                 if processed:
+                    print("Evaluating the batch request... " + str(batch.batch_id))
                     eval_entry = EvaluationEntry.get_eval_entry(batch.batch_id, project_name)
                     if eval_entry:
                         continue
                     else:
                         pass
+        
+        # Clear the temporary directory
+        utility.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
+        utility.delete_repository(f"tmp/{project_name}/tests/{test_source}")
                         
 
 if __name__ == "__main__":
     # run_specific_project_evaluation("human-eval", {"ctx": "initial", "test_source": "human-written", "target": "full_repository"})
 
-    ensure_initial_test_suite_correctness("human-eval", "chatgpt")
+    # ensure_initial_test_suite_correctness("human-eval", "pynguin")
+
+    run_full_pipeline("human_eval")

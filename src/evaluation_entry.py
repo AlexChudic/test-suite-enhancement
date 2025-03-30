@@ -43,7 +43,7 @@ class EvaluationEntry:
     @classmethod
     def get_eval_entry(cls, batch_id, project_name):
         """Check if an evaluation entry exists."""
-        if not os.path.exists(os.join(EVALUATION_DIR, f"{project_name}.jsonl")):
+        if not os.path.exists(os.path.join(EVALUATION_DIR, f"{project_name}.jsonl")):
             return None
         
         eval_entries = cls.load_all(project_name)

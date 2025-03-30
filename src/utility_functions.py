@@ -106,8 +106,22 @@ def extract_test_cases_from_file(file_path):
             untabulated_test_cases.append(test_case)
 
     return untabulated_test_cases
-        
 
+
+def remove_last_test_case(source_code):
+    """Returns the test cases for the specified class."""
+    lines = source_code.split('\n')
+    i = len(lines) - 1
+
+    # Go backwards to find the end of the last test case
+    while i >= 0:
+        if lines[i].strip().startswith('def test_'):
+            return '\n'.join(lines[:i])
+        i -= 1
+    
+    return None
+        
+        
 ### Utility functions for Few-shot Example Selection ###
 
 def get_test_without_problem_definition(file_path):
@@ -134,10 +148,16 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
 
     # CASE 1: Choose test classes randomly
     if selection_mode == "random_from_all":
-        for i in range(num_test_cases):
+        def choose_random_test_case(test_files):
             random_test_file = random.choice(test_files)
             test_cases = extract_test_cases_from_file(os.path.join(test_dir, random_test_file))
-            selected_test_cases.append( random.choice(test_cases) )
+            if len(test_cases) == 0:
+                return choose_random_test_case(test_files)
+            return random.choice(test_cases)
+
+        for i in range(num_test_cases):
+            random_test_case = choose_random_test_case(test_files)
+            selected_test_cases.append( random_test_case )
     
     # CASE 2: Choose random unit tests from the class under test
     if selection_mode == "random_from_class_under_test":
@@ -265,7 +285,7 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
 
 if __name__ == "__main__":
     # delete_python_files("tmp/human-eval/tests/human-written")
-    copy_python_files("data/human-eval/tests/chatgpt", "tmp/human-eval/tests/chatgpt")
+    copy_python_files("data/human-eval/tests/human-written", "tmp/human_eval/tests/human-written")
     # chosen_test_cases = choose_fewshot_example_test_cases("problem_and_class_similarity", "tmp/human-eval/tests/chatgpt", "HumanEval_5.py", 2)
     pass
 

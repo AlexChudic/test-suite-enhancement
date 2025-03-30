@@ -21,7 +21,7 @@ Make sure to keep the tests maintainable and easy to understand, while aiming fo
 class BatchRequest:
 
     def __init__(self, output_path, dataset_path, system_prompt=None, client=None, identifiers={}, batch_id=None, status="initial",
-                result_json=None, task_json=None, submit_job=False, is_loaded_form_json=False, corrupted_tests=[]):
+                result_json=None, task_json=None, submit_job=False, is_loaded_form_json=False, corrupted_tests=[], fixed_corrupted_tests=[]):
         """
         Primary constructor
         
@@ -56,6 +56,7 @@ class BatchRequest:
         self.task_json = task_json
         self.result_json = result_json
         self.corrupted_tests = corrupted_tests
+        self.fixed_corrupted_tests = fixed_corrupted_tests
         if not is_loaded_form_json:
             print("NEW Batch request created!")
             print(self.to_json())
@@ -78,6 +79,7 @@ class BatchRequest:
             result_json=batch_data["result_json"],
             submit_job=batch_data["submit_job"],
             corrupted_tests=batch_data["corrupted_tests"],
+            fixed_corrupted_tests=batch_data["fixed_corrupted_tests"] if "fixed_corrupted_tests" in batch_data else [],
             is_loaded_form_json=True
         )
 
@@ -325,16 +327,42 @@ class BatchRequest:
                 
                 # print(f"Output successfully saved to {file_name}")
 
-            # In case of corrupted LLM output, save the name of the module
+            # In case of corrupted LLM output, try fixing it
             else:
-                self.corrupted_tests.append(module_name)
-                print("ERROR output:\n" + output)
-                # raise ValueError("Invalid structure: No closing ``` found in the output.")
+                print("ERROR output:\n" + output[start_index:])
+                fixed = self.fix_corrupted_output(output[start_index:], module_name)   
+                if not fixed:
+                    self.corrupted_tests.append(module_name)
+                else:
+                    self.fixed_corrupted_tests.append(module_name)
+                    print(f"Output successfully saved to {module_name}.py")
+                
             
         except ValueError as ve:
             raise ve
         except Exception as e:
             print(f"An error occurred while saving the file: {e}")
+
+
+    def fix_corrupted_output(self, output, module_name):
+        """Fixes corrupted output by removing the unfinished test case and keeping the rest"""
+
+        fixed_output = uf.remove_last_test_case(output)
+        print(fixed_output)
+        if not fixed_output:
+            print("No test cases found in the output.")
+            return False
+        else:
+            file_name = f"test_{module_name}.py"
+            full_file_path = os.path.join(self.output_path, file_name)
+
+            print("Saving the fixed output to file: " + full_file_path)
+            print(fixed_output)
+
+            # Save the cleaned output to the file
+            with open(full_file_path, "w") as file:
+                file.write(fixed_output)
+            return True
 
 
     def get_system_prompt(self):
@@ -370,6 +398,7 @@ class BatchRequest:
             "system_prompt": self.system_prompt,
             "submit_job": self.submit_job,
             "corrupted_tests": self.corrupted_tests,
+            "fixed_corrupted_tests": self.fixed_corrupted_tests
         }
     
     def __str__(self):
