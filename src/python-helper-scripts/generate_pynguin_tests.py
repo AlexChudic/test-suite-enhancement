@@ -9,8 +9,15 @@ package_path = "tmp/package.txt"
 # Get all Python files in the project path
 python_files = [f for f in os.listdir(project_path) if f.endswith(".py")]
 
+# Check the files in output dir 
+output_files = [f.replace("test_", "") for f in os.listdir(output_path) if f.endswith(".py")]
+
 # Loop through each Python file and run the Docker command
 for python_file in python_files:
+    if python_file in output_files:
+        print(f"Skipping {python_file} as it already has tests generated.")
+        continue
+    
     module_name = os.path.splitext(python_file)[0]  # Get the file name without the .py extension
     print(module_name)
     command = [
