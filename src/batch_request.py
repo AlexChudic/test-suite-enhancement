@@ -113,6 +113,13 @@ class BatchRequest:
                 self.submit_batch_job()
                 print("Batch job submitted.")
                 self.status = "submitted"
+
+        if self.status == "failed" and self.submit_job:
+            print(f"Batch {self.batch_id} has failed. Resubmitting the job.")
+            self.submit_batch_job()
+            self.status = "submitted"
+            print("Batch job submitted.")
+            return False
         
     
 
@@ -329,13 +336,13 @@ class BatchRequest:
 
             # In case of corrupted LLM output, try fixing it
             else:
-                print("ERROR output:\n" + output[start_index:])
+                # print("ERROR output:\n" + output[start_index:])
                 fixed = self.fix_corrupted_output(output[start_index:], module_name)   
                 if not fixed:
                     self.corrupted_tests.append(module_name)
                 else:
                     self.fixed_corrupted_tests.append(module_name)
-                    print(f"Output successfully saved to {module_name}.py")
+                    # print(f"Output successfully saved to {module_name}.py")
                 
             
         except ValueError as ve:
@@ -348,16 +355,12 @@ class BatchRequest:
         """Fixes corrupted output by removing the unfinished test case and keeping the rest"""
 
         fixed_output = uf.remove_last_test_case(output)
-        print(fixed_output)
+        
         if not fixed_output:
-            print("No test cases found in the output.")
             return False
         else:
             file_name = f"test_{module_name}.py"
             full_file_path = os.path.join(self.output_path, file_name)
-
-            print("Saving the fixed output to file: " + full_file_path)
-            print(fixed_output)
 
             # Save the cleaned output to the file
             with open(full_file_path, "w") as file:
@@ -385,6 +388,11 @@ class BatchRequest:
                     print(task["body"]["messages"][1]["content"])
                     print("\n\n")
 
+    def get_corrupted_output_data(self):
+        return {
+            "corrupted_output" : len(self.corrupted_tests),
+            "fixed_corrupted_output" : len(self.fixed_corrupted_tests)
+        }
 
     def to_json(self):
         return {

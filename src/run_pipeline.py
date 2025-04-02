@@ -75,9 +75,9 @@ def run_full_pipeline(project_name):
     client = OpenAI()
     batch_requests = use_gpt.load_batch_requests(client)
 
-    sources = ["human_written"] #, "pynguin", "chatgpt"]
-    example_selection_modes = ["random_from_all", "random_from_class_under_test", "problem_similarity", "class_similarity_no_definition", 
-                               "class_similarity_with_definition", "problem_and_class_similarity"]
+    sources = ["human_written"]#, "pynguin", "chatgpt"]
+    example_selection_modes = ["random_from_all"]#, "random_from_class_under_test", "problem_similarity", "class_similarity_no_definition", 
+                               #"class_similarity_with_definition", "problem_and_class_similarity"]
     num_test_cases = [1, 3, 5]
 
     for test_source in sources:
@@ -133,9 +133,19 @@ def run_full_pipeline(project_name):
                     print("Evaluating the batch request... " + str(batch.batch_id))
                     eval_entry = EvaluationEntry.get_eval_entry(batch.batch_id, project_name)
                     if eval_entry:
-                        continue
+                        eval_entry.run_evaluation()
+                        eval_entry.save()
                     else:
-                        pass
+                        eval_data = {
+                            "corruption_data" : batch.get_corrupted_output_data()
+                        }
+                        eval_entry = EvaluationEntry(
+                            batch.batch_id,
+                            identifiers,
+                            eval_data
+                        )
+                        eval_entry.run_evaluation()
+                        eval_entry.save()
         
         # Clear the temporary directory
         utility.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
