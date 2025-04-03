@@ -123,7 +123,7 @@ class EvaluationEntry:
                 lines = f.readlines()
                 return len(lines)
         else:
-            return self.eval_id.split("_")[1]
+            return int(self.eval_id.split("_")[0])
             
     def get_project_name(self):
         return self.identifiers["project_name"]
@@ -138,9 +138,14 @@ class EvaluationEntry:
 
         if self.is_loaded_from_json:
             id = self.get_evalId_number()
-            with open(self.get_json_path(), "rw") as file:
-                lines = file.readlines()
-                print(lines)
+            lines = []
+            with open(self.get_json_path(), "r") as file:
+                lines = file.read().split("\n")
+                
+            lines[id] = json.dumps(self.to_json())
+
+            with open(self.get_json_path(), "w") as file:
+                file.write("\n".join(lines))
             print(f"Evaluation entry updated! Eval ID: {self.eval_id}, Status {self.get_status()}")
         else:
             with open(self.get_json_path(), "a") as file:
