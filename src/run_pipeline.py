@@ -11,40 +11,6 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-def run_pipeline(project_name):
-    # Get the project evaluation metrics
-    ev.evaluate_project_directory(project_name)
-
-
-def run_initial_project_evaluations(project_name):
-    print(f"Running initial evaluations for project: {project_name}\n")
-    ev.evaluate_project_directory(project_name, identifiers={"ctx": "initial"})
-    
-    for test_source in ["human-written", "pynguin", "chatgpt"]:
-        print(f"Running initial evaluations for project: {project_name} with test source: {test_source}\n")
-        utility.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
-        ev.evaluate_project_directory(project_name, identifiers={"ctx": "initial", "test_source": test_source, "target": "full_repository"})
-        ev.evaluate_project_directory(project_name, identifiers={"ctx": "initial", "test_source": test_source, "target": "tests"}, directory_path=f"tests/{test_source}")
-        utility.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
-        utility.delete_repository(f"tmp/{project_name}/tests/{test_source}")
-        
-        
-def run_specific_project_evaluation(project_name, ctx):
-    print(f"Running specific evaluations for project: {project_name}\n")
-
-    if ctx["test_source"]:
-        utility.copy_python_files(f"data/{project_name}/tests/{ctx['test_source']}", f"tmp/{project_name}/tests/{ctx['test_source']}")
-
-    if ctx["target"] == "tests":
-        ev.evaluate_project_directory(project_name, identifiers=ctx, directory_path=f"tests/{ctx['test_source']}")
-    else:  
-        ev.evaluate_project_directory(project_name, identifiers=ctx)
-
-    if ctx["test_source"]:
-        utility.delete_python_files(f"tmp/{project_name}/tests/{ctx['test_source']}")
-        utility.delete_repository(f"tmp/{project_name}/tests/{ctx['test_source']}")
-
-
 def ensure_initial_test_suite_correctness(project_name, test_source):
     """Ensure the initial test suite is correct - if not, apply rule-based repair"""
     test_suite_path = f"data/{project_name}/tests/{test_source}"
@@ -54,6 +20,18 @@ def ensure_initial_test_suite_correctness(project_name, test_source):
         json.dump(res, file, indent=4)
     
     return res
+
+def run_initial_project_evaluations(project_name):
+    print(f"Running initial evaluations for project: {project_name}\n")
+    ev.evaluate_project_directory(project_name)
+    
+    for test_source in ["human-written", "pynguin", "chatgpt"]:
+        print(f"Running initial evaluations for project: {project_name} with test source: {test_source}\n")
+        utility.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
+        ev.evaluate_project_directory(project_name)
+        ev.evaluate_project_directory(project_name, directory_path=f"tests/{test_source}")
+        utility.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
+        utility.delete_repository(f"tmp/{project_name}/tests/{test_source}")
 
 
 def run_single_eval_setting():
@@ -75,14 +53,14 @@ def run_full_pipeline(project_name):
     client = OpenAI()
     batch_requests = use_gpt.load_batch_requests(client)
 
-    sources = ["human_written"]#, "pynguin", "chatgpt"]
-    example_selection_modes = ["random_from_all"]#, "random_from_class_under_test", "problem_similarity", "class_similarity_no_definition", 
-                               #"class_similarity_with_definition", "problem_and_class_similarity"]
+    sources = ["human_written", "pynguin", "chatgpt"]
+    example_selection_modes = ["random_from_all", "random_from_class_under_test", "problem_similarity", "class_similarity_no_definition", 
+                               "class_similarity_with_definition", "problem_and_class_similarity"]
     num_test_cases = [1, 3, 5]
 
     for test_source in sources:
         # Copy the test files to a temporary directory
-        utility.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
+        # utility.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
 
         for example_selection_mode in example_selection_modes:
             for num_test_case in num_test_cases:
@@ -101,8 +79,9 @@ def run_full_pipeline(project_name):
                 batch = use_gpt.get_batch_request(identifiers, batch_requests)
                 if not batch:
                     # If batch does not exist, create a new one
+                    identifier_string = utility.generate_identifier_string(identifiers)
                     new_batch_request = BatchRequest(
-                        f"data/{project_name}/tests/{test_source}/enhanced/",
+                        f"data/{project_name}/tests/{test_source}/enhanced/{identifier_string}",
                         f"tmp/{project_name}/tests/{test_source}",
                         None,
                         client,
@@ -125,7 +104,7 @@ def run_full_pipeline(project_name):
                         processed = True
 
                     else:
-                        print(f"Batch request is not processed yet. Status: {batch_status}")
+                        print(f"INFO: Batch request is not processed yet. Status: {batch_status}")
                     use_gpt.save_batch_requests(batch_requests)
 
                 # If batch is processed, run the specific project evaluation
@@ -133,8 +112,8 @@ def run_full_pipeline(project_name):
                     print("Evaluating the batch request... " + str(batch.batch_id))
                     eval_entry = EvaluationEntry.get_eval_entry(batch.batch_id, project_name)
                     if eval_entry:
-                        eval_entry.run_evaluation()
-                        eval_entry.save()
+                        eval_entry.run_correctness_evaluation()
+                        eval_entry.run_enhanced_evaluation()
                     else:
                         eval_data = {
                             "corruption_data" : batch.get_corrupted_output_data()
@@ -144,17 +123,22 @@ def run_full_pipeline(project_name):
                             identifiers,
                             eval_data
                         )
-                        eval_entry.run_evaluation()
-                        eval_entry.save()
+                        eval_entry.run_correctness_evaluation()
+                        eval_entry.run_enhanced_evaluation()
         
         # Clear the temporary directory
-        utility.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
-        utility.delete_repository(f"tmp/{project_name}/tests/{test_source}")
+        # utility.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
+        # utility.delete_repository(f"tmp/{project_name}/tests/{test_source}")
                         
 
 if __name__ == "__main__":
-    # run_specific_project_evaluation("human-eval", {"ctx": "initial", "test_source": "human-written", "target": "full_repository"})
+    # run_specific_project_evaluation("human_eval", {"ctx": "initial", "test_source": "human-written", "target": "full_repository"})
 
-    # ensure_initial_test_suite_correctness("human-eval", "pynguin")
+    # ensure_initial_test_suite_correctness("human_eval", "pynguin")
 
     run_full_pipeline("human_eval")
+
+    # data_test_path = f"data/human_eval/tests/human_written/enhanced/human_written_random_from_all_5/"
+    # tmp_test_path = f"tmp/human_eval/tests/human_written/"
+    # utility.copy_python_files(data_test_path, tmp_test_path)
+

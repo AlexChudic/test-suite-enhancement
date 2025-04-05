@@ -302,7 +302,6 @@ class BatchRequest:
 
         Args:
             output (str): The ChatGPT output containing Python code
-            output_path (str): The directory to save the output file
             module_name (str): The name of the module under test
         """
         try:

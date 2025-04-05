@@ -9,16 +9,6 @@ import re
 
 BATCH_REQUESTS_DIR="data/batch_requests/"
 
-# Setting up the variables
-BATCH_REQUESTS_JSON="data/batch_requests.jsonl"
-INPUT_DATASET_PATH = 'tmp/human-eval'
-
-BATCH_JOB_NAME = "unit_test_generation"
-BATCH_OUTPUT_DIR = 'data/human-eval/tests/chatgpt'
-BATCH_JSON_NAME = "batch_requests.jsonl"
-MODEL_NAME = "gpt-4o-mini"
-TEMPERATURE = 0.1
-
 # Load the environment variables
 load_dotenv(override=True)
 
@@ -87,32 +77,32 @@ def continue_processing_batch_requests(client):
 if __name__ == "__main__":
     batch_requests = load_batch_requests(client=client)
     
-    identifiers = {
-        "project_name": "human-eval",
-        "job_type" : "fewshot_test_suite_enhancement",
-        "test_source": "chatgpt",
-        "test_selection_mode": "random_from_class_under_test",
-        "num_test_cases": 2,
-        "model_name": "gpt-4o-mini",
-        "temperature": 0.1
-    }
-    if batch_exists(identifiers, batch_requests):
-        print("Batch request already exists.")
-    else:
-        new_batch_request = BatchRequest(
-            "data/human-eval/tests/chatgpt/enhanced/",
-            "data/human-eval/tests/chatgpt",
-            None,
-            client,
-            identifiers)
-        new_batch_request.print_batch_tasks_user_prompts()
-        batch_requests.append(new_batch_request)
+    # identifiers = {
+    #     "project_name": "human_eval",
+    #     "job_type" : "fewshot_test_suite_enhancement",
+    #     "test_source": "chatgpt",
+    #     "test_selection_mode": "random_from_class_under_test",
+    #     "num_test_cases": 2,
+    #     "model_name": "gpt-4o-mini",
+    #     "temperature": 0.1
+    # }
+    # if batch_exists(identifiers, batch_requests):
+    #     print("Batch request already exists.")
+    # else:
+    #     new_batch_request = BatchRequest(
+    #         "data/human_eval/tests/chatgpt/enhanced/",
+    #         "data/human_eval/tests/chatgpt",
+    #         None,
+    #         client,
+    #         identifiers)
+    #     new_batch_request.print_batch_tasks_user_prompts()
+    #     batch_requests.append(new_batch_request)
 
-    for batch_request in batch_requests:
-        batch_request.check_status()
-        batch_request.continue_processing()
-        # batch_request.print_batch_tasks_user_prompts()
-        # print(f"SYSTEM PROMPT= {batch_request.get_system_prompt()}\n\n")
+    # for batch_request in batch_requests:
+    #     batch_request.check_status()
+    #     batch_request.continue_processing()
+    #     # batch_request.print_batch_tasks_user_prompts()
+    #     # print(f"SYSTEM PROMPT= {batch_request.get_system_prompt()}\n\n")
 
-    save_batch_requests(batch_requests)
+    # save_batch_requests(batch_requests)
     pass

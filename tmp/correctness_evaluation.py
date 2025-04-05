@@ -52,15 +52,24 @@ def check_correctness(test_case_path):
         return ("Unknown Error", "Could not parse test results.")
         
 
-def extract_function_name(cleaned_output):
-        match = re.search(r"assert\s+(\w+)\s*\(", cleaned_output)
-        return match.group(1) if match else None
+def extract_function_name(test_path, module_name):
+    module_path = "/".join(test_path.split("/")[:-3]) + "/" + module_name + ".py"
+    if not os.path.exists(module_path):
+        raise FileNotFoundError(f"Target file not found: {module_path}")
+    else:
+        with open(module_path, "r", encoding="utf-8") as f:
+            module_source_code = f.read()
+        
+        pattern = r'^def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\('
+        matches = re.findall(pattern, module_source_code, re.MULTILINE)
+        print(matches)
+        return matches
 
 
 def add_missing_function_names(test_class_source_code):
     print("Applying Rule 1: Adding missing function names...")
-    print("BEFORE")
-    print(test_class_source_code)
+    # print("BEFORE")
+    # print(test_class_source_code)
     lines = test_class_source_code.split("\n")
     imports = "\n".join(line for line in lines if line.startswith("import") or line.startswith("from"))
     non_imports = [line for line in lines if not (line.startswith("import") or line.startswith("from"))]
@@ -99,8 +108,8 @@ def add_missing_function_names(test_class_source_code):
 
     # Create new formatted content
     test_class_source_code = f"{imports}\n\n" + "\n\n".join(test_functions)
-    print("AFTER")
-    print(test_class_source_code)
+    # print("AFTER")
+    # print(test_class_source_code)
 
 
 def remove_self_from_standalone_functions(test_class_source_code, file):
@@ -119,10 +128,10 @@ def remove_self_from_standalone_functions(test_class_source_code, file):
             
             # Check if first argument is self
             if re.match(r'def\s+\w+\s*\(self\b', line):
-                print("Applying Rule 5: Removing self argument from standalone test functions...")
-                print("File: ", file)
-                func_name = re.search(r'def\s+(\w+)', line).group(1)
-                print("Function: ", func_name)
+                print("Applying Rule 4: Removing self argument from standalone test functions...")
+                # print("File: ", file)
+                # func_name = re.search(r'def\s+(\w+)', line).group(1)
+                # print("Function: ", func_name)
                 
                 # Remove self parameter
                 line = re.sub(r'def\s+(\w+)\s*\(self\s*(?:,\s*)?', r'def \1(', line)
@@ -140,7 +149,7 @@ def rule_based_repair(test_case_path, error_msg, test_class, output):
         test_class_source_code = f.read()
 
     # RULE 5: Remove module definition from test class
-    if error_msg and "ModuleNotFoundError" in error_msg:
+    if error_msg and type(error_msg) == str and "ModuleNotFoundError" in error_msg:
         print("Applying Rule 5: Removing module definition from test class...")
         new_lines = []
         missing_module = re.search(r"ModuleNotFoundError: No module named '(\w+)'", error_msg).group(1)
@@ -165,9 +174,6 @@ def rule_based_repair(test_case_path, error_msg, test_class, output):
         output["repair_stats"]["syntax_errors"].append(test_class)
         return "Syntax Error"
 
-    function_name = extract_function_name(test_class_source_code)
-    module_name = os.path.basename(test_case_path).replace(".py", "").removeprefix("test_")
-
     # RULE 2: Add missing pytest import
     pytest_import = "import pytest"
     if pytest_import not in test_class_source_code:
@@ -175,9 +181,12 @@ def rule_based_repair(test_case_path, error_msg, test_class, output):
         test_class_source_code = pytest_import + "\n" + test_class_source_code
         output["repair_stats"]["rule_2"].append(test_class)
 
+    module_name = os.path.basename(test_case_path).replace(".py", "").removeprefix("test_")
+    function_names = extract_function_name(test_case_path, module_name)
+
     # RULE 3: Add missing module import statement
-    module_import = f"from {module_name} import {function_name}"
-    if module_import not in test_class_source_code and function_name != None:
+    module_import = f"from {module_name} import {', '.join(function_names)}"
+    if module_import not in test_class_source_code and function_names != []:
         print("Applying Rule 3: Adding missing module import statement...")
         test_class_source_code = module_import + "\n" + test_class_source_code
         output["repair_stats"]["rule_3"].append(test_class)
@@ -218,8 +227,6 @@ def get_error_tests(report_path):
         for test in report.get("tests", [])
         if test.get("outcome") == "error"
     ]
-
-    print(error_tests)
 
     return error_tests
 
@@ -393,14 +400,16 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
     }
 
     for test_class in test_classes:
-        # if test_class not in ["test_HumanEval_20.py", "test_HumanEval_158.py"]:
+        # if test_class not in ["test_HumanEval_32.py", "test_HumanEval_50.py", "test_HumanEval_107.py"]:
         #     continue
-
-        # Ensure the test function is not implemented in the test class
-        remove_test_function_implementation(path, test_class, output)
 
         # Evaluate the test class correctness
         test_class_path = os.path.join(path, test_class)
+        print("INFO: Evaluating correctness of the test class: ", test_class_path)
+
+        # Ensure the test function is not implemented in the test class
+        remove_test_function_implementation(path, test_class, output)
+        
         res = check_correctness(test_class_path)
         passed = add_correction_evaluation_stats(stats_pre_repair, res[0])
 
@@ -456,13 +465,15 @@ def remove_test_function_implementation(path, test_class, output):
     with open(test_class_path, "r", encoding="utf-8") as f:
         test_class_source_code = f.read()
 
-    function_name = extract_function_name(test_class_source_code)
+    module_name = test_class.replace(".py", "").removeprefix("test_")
+    function_names = extract_function_name(path, module_name)
 
     # RULE 0: Remove module definition from test class
-    if f"def {function_name}(" in test_class_source_code:
-        print("Applying Rule 0: Removing module definition from test class...")
-        remove_functions(test_class_path, [function_name])
-        output["repair_stats"]["rule_0"].append(test_class)
+    for function_name in function_names:
+        if f"def {function_name}(" in test_class_source_code:
+            print("Applying Rule 0: Removing module definition from test class...")
+            remove_functions(test_class_path, [function_name])
+            output["repair_stats"]["rule_0"].append(test_class)
 
 
 def print_file(path):
@@ -471,7 +482,7 @@ def print_file(path):
         print(test_class_source_code)
 
 if __name__ == "__main__":
-    # print("CORRECTNESS EVALUATION RESULTS:")
-    # print(evaluate_functional_correctness("data/human-eval/tests/chatgpt/enhanced") )
+    print("CORRECTNESS EVALUATION RESULTS:")
+    print(evaluate_functional_correctness("data/human_eval/tests/chatgpt/enhanced") )
 
-    get_class_under_test_coverage_metrics("tmp/human_eval/tests/chatgpt/test_HumanEval_107.py")
+    # get_class_under_test_coverage_metrics("tmp/human_eval/tests/chatgpt/test_HumanEval_107.py")

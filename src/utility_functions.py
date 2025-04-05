@@ -2,6 +2,7 @@ import os
 import shutil
 import random
 import ast
+import shutil
 from Levenshtein import distance
 
 def copy_python_files(input_path: str, copy_path: str):
@@ -35,7 +36,18 @@ def delete_python_files(target_path: str):
 def delete_repository(target_path):
     """Deletes the specified directory if it exists"""
     if os.path.exists(target_path):
-        os.rmdir(target_path)
+        shutil.rmtree(target_path)
+
+
+def generate_identifier_string(identifiers):
+    """Generates a string representation of the identifiers dictionary."""
+    identifier_string = "_".join([
+        identifiers["test_source"],
+        str(identifiers["test_selection_mode"]),
+        str(identifiers["num_test_cases"])
+    ]).lower()
+    
+    return identifier_string
 
 
 ### File Reading and Test Case Extraction Functions ###

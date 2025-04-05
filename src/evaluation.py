@@ -4,12 +4,9 @@ import json
 import subprocess
 import os
 import base64
-import tmp.correctness_evaluation as correctness_evaluation
 from dotenv import load_dotenv
-from requests.auth import HTTPBasicAuth
-from datetime import datetime
 
-def evaluate_project_directory(project_name, identifiers={}, directory_path=None):
+def evaluate_project_directory(project_name, directory_path=None):
     """Evaluates a repository using the SonarQube API."""
     
     sonar_project_name = os.getenv("SONAR_PROJECT_NAME")
@@ -36,15 +33,14 @@ def evaluate_project_directory(project_name, identifiers={}, directory_path=None
                       "cognitive_complexity%2Ccomment_lines%2Clines_to_cover%2Cuncovered_lines%2Ccoverage%2Cline_coverage")
     sonar_qube_result = make_get_request(sonar_qube_url)
     
-    identifiers["directory"] = directory_path
-    formated_results = format_sonarqube_results(sonar_qube_result, project_name, identifiers)
+    formated_results = format_sonarqube_results(sonar_qube_result)
 
-    save_path = os.path.join("data", project_name, "eval", "sonarqube_results.json")
-    save_sonarqube_results(formated_results, save_path)
-
-    # Print and return the result
-    print("SonarQube Result:\n" + formated_results)
-    return formated_results
+    if not formated_results:
+        print("Error retrieving SonarQube results.")
+        return None
+    else:
+        print("SonarQube Result:\n" + formated_results)
+        return formated_results
 
 
 def execute_sonarqube_evaluation(project_name):
@@ -134,7 +130,7 @@ def make_get_request(url):
         return None
 
 
-def format_sonarqube_results(results, project_name, identifiers):
+def format_sonarqube_results(results):
     """Formats the SonarQube results into a more readable format."""
     
     try:
@@ -146,13 +142,7 @@ def format_sonarqube_results(results, project_name, identifiers):
             elif "period" in measure:
                 metrics[measure["metric"]] = measure["period"]["value"]
         
-        output = {
-            "project" : project_name,
-            "identifiers": identifiers,
-            "metrics": metrics,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        return json.dumps(output, indent=4)
+        return json.dumps(metrics, indent=4)
     except Exception as e:
         print("Error formatting SonarQube results:", e)
         return None
@@ -201,4 +191,4 @@ def evaluate_test_correctness():
 
 
 if __name__ == "__main__":
-    evaluate_project_directory("human-eval")
+    evaluate_project_directory("human_eval")

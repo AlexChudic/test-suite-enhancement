@@ -1,6 +1,7 @@
 import json
 import os
 import src.utility_functions as uf
+import src.evaluation as eval
 import tmp.correctness_evaluation as correctness_evaluation
 from datetime import datetime
 
@@ -26,6 +27,7 @@ class EvaluationEntry:
         if not is_loaded_from_json:
             print("NEW Evaluation entry created!")
             print(self.to_json())
+            self.save(new=True)
         else:
             # print(f"Evaluation entry loaded from JSON! Eval ID: {self.eval_id}, Status: {self.get_status()}")
             pass
@@ -71,29 +73,76 @@ class EvaluationEntry:
                 entries.append(entry)
             return entries
 
-    def run_evaluation(self):
-        if self.get_status() != "initial":
-            print("Skipping evaluation, not in state=initial")
 
+    def run_correctness_evaluation(self):
+        """Run the correctness evaluation on the enhanced test suite.
+                - Ensure the tests are working correctly
+                - Apply Rule-based repair if not passed
+        """
+        if self.get_status() == "initial":
+            data_test_path = f"data/{ self.get_project_name() }/tests/{ self.get_test_source() }/enhanced/{ uf.generate_identifier_string(self.identifiers) }/"
+            if os.path.exists(data_test_path):
+                # Enhanced test suite has been generated from the batch request - continue with evaluation
+                tmp_test_path = f"tmp/{ self.get_project_name() }/tests/{ self.get_test_source() }/"
+                uf.copy_python_files(data_test_path, tmp_test_path)
+                
+                res = correctness_evaluation.evaluate_functional_correctness(tmp_test_path)
+                self.eval_data["correctness_evaluation"] = res
+                print(res)
+
+                uf.copy_python_files(tmp_test_path, data_test_path)
+                uf.delete_python_files(tmp_test_path)
+                uf.delete_repository(tmp_test_path)
+
+                self.status = "corrected"
+                self.save()
+            else:
+                # Enhanced test suite has not been generated yet
+                print(f"Skipping correctness evaluation - test suite path does not exist: {data_test_path}")
         else:
-            # STEP 1: Run the test correctness evaluation
-                # Ensure the tests are working correctly
-                # Apply Rule-based repair if not
-                # Ensure the tests improve the coverage
+            print("Skipping correctness evaluation - not in state=initial")
 
-            test_suite_path = f"data/{ self.get_project_name() }/tests/{ self.get_test_source() }"
-            print(test_suite_path)
-            # res = correctness_evaluation.evaluate_functional_correctness(test_suite_path)
+    
+    def run_enhanced_evaluation(self):
+        """Run the enhanced evaluation on the enhanced test suite.
+                - Evaluate full project to get code coverage
+                - Evaluate test directory to get code quality metrics
+        """
+        if self.get_status() == "corrected":
 
+            data_test_path = f"data/{ self.get_project_name() }/tests/{ self.get_test_source() }/enhanced/{ uf.generate_identifier_string(self.identifiers) }/"
+            
+            if os.path.exists(data_test_path):
 
+                tmp_test_path = f"tmp/{ self.get_project_name() }/tests/{ self.get_test_source() }/"
+                uf.copy_python_files(data_test_path, tmp_test_path)
 
-            # STEP 2: Run the initial project evaluations - using the example tests only
-                # Evaluate full project to get code coverage
-                # Evaluate test directory to get code quality metrics
-            # STEP 3: Run the specific project evaluation - with the enhanced test suite
-                # Evaluate full project to get code coverage
-                # Evaluate test directory to get code quality metrics
-            # STEP 4: Save the eval_entry to the JSON file
+                project_name = self.get_project_name()
+                test_source = self.get_test_source()
+                
+                uf.copy_python_files(f"data/{project_name}/tests/", f"tmp/{project_name}/tests/{test_source}")
+                
+                # First evaluate the full project to get code coverage
+                project_eval_metrics = eval.evaluate_project_directory(project_name)
+                self.eval_data["enhanced_project_evaluation"] = project_eval_metrics
+                print(project_eval_metrics)
+
+                # Then evaluate the test directory to get code quality metrics
+                test_eval_metrics = eval.evaluate_project_directory(project_name, directory_path=f"tests/{test_source}")
+                self.eval_data["enhanced_test_evaluation"] = test_eval_metrics
+                print(test_eval_metrics)
+                            
+                uf.delete_python_files(tmp_test_path)
+                uf.delete_repository(tmp_test_path)
+
+                self.status = "evaluated"
+                self.save()
+
+            else:
+                print(f"Skipping enhanced evaluation - test suite path does not exist: {data_test_path}")
+        else:
+            print("Skipping enhanced evaluation - not in state=corrected")
+            
 
 
     def generate_eval_id(self):
@@ -131,12 +180,12 @@ class EvaluationEntry:
     def get_test_source(self):
         return self.identifiers["test_source"]
 
-    def save(self):
+    def save(self, new=False):
         """Save the evaluation entry to a JSON file."""
         if not os.path.exists(EVALUATION_DIR):
             os.makedirs(EVALUATION_DIR)
 
-        if self.is_loaded_from_json:
+        if not new:
             id = self.get_evalId_number()
             lines = []
             with open(self.get_json_path(), "r") as file:
