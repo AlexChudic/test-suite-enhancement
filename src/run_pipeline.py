@@ -13,8 +13,14 @@ load_dotenv(override=True)
 
 def ensure_initial_test_suite_correctness(project_name, test_source):
     """Ensure the initial test suite is correct - if not, apply rule-based repair"""
-    test_suite_path = f"data/{project_name}/tests/{test_source}"
+    utility.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
+
+    test_suite_path = f"tmp/{project_name}/tests/{test_source}/"
     res = correctness_evaluation.evaluate_functional_correctness(test_suite_path)
+
+    utility.copy_python_files(f"tmp/{project_name}/tests/{test_source}", f"data/{project_name}/tests/{test_source}")
+    utility.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
+    utility.delete_repository(f"tmp/{project_name}/tests/{test_source}")
 
     with open(f"data/{project_name}/tests/{test_source}/correctness_evaluation.json", "w") as file:
         json.dump(res, file, indent=4)
@@ -59,8 +65,6 @@ def run_full_pipeline(project_name):
     num_test_cases = [1, 3, 5]
 
     for test_source in sources:
-        # Copy the test files to a temporary directory
-        # utility.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
 
         for example_selection_mode in example_selection_modes:
             for num_test_case in num_test_cases:
@@ -91,7 +95,7 @@ def run_full_pipeline(project_name):
                     batch_requests.append(new_batch_request)
                     use_gpt.save_batch_requests(batch_requests)
                 else:
-                    batch.continue_processing(submit_job=True)
+                    batch.continue_processing(submit_job=False) # Change to True when everything is ready!
                     batch_status = batch.check_status()
                     
                     # If the batch is completed, continue processing - extract the results
@@ -125,16 +129,11 @@ def run_full_pipeline(project_name):
                         )
                         eval_entry.run_correctness_evaluation()
                         eval_entry.run_enhanced_evaluation()
-        
-        # Clear the temporary directory
-        # utility.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
-        # utility.delete_repository(f"tmp/{project_name}/tests/{test_source}")
                         
 
 if __name__ == "__main__":
     # run_specific_project_evaluation("human_eval", {"ctx": "initial", "test_source": "human-written", "target": "full_repository"})
-
-    # ensure_initial_test_suite_correctness("human_eval", "pynguin")
+    # ensure_initial_test_suite_correctness("human_eval", "human_written")
 
     run_full_pipeline("human_eval")
 
