@@ -4,6 +4,8 @@ import random
 import ast
 import shutil
 from Levenshtein import distance
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 def copy_python_files(input_path: str, copy_path: str):
     """
@@ -154,6 +156,15 @@ def extract_problem_definition_from_string(file):
     return None
 
 
+def calculate_cosine_similarity(text1, text2):
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform([text1, text2])
+
+    # Compute cosine similarity
+    similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])
+    return 1-similarity[0][0] # Return 1-cossimilarity to get distance
+
+
 def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test, num_test_cases=1):
     test_files = [f for f in os.listdir(test_dir) if f.endswith(".py")]
     selected_test_cases = []
@@ -191,7 +202,7 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
             class_file_string = get_python_file_content(os.path.join(class_dir, class_file))
             class_file_problem_definition = extract_problem_definition_from_string(class_file_string)
             try:
-                class_similarity_scores.append(distance(class_file_problem_definition, problem_definition))
+                class_similarity_scores.append(calculate_cosine_similarity(class_file_problem_definition, problem_definition))
             except Exception as e:
                 class_similarity_scores.append(1000)
                 
@@ -218,7 +229,7 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
         for class_file in class_files:
             class_file_string = get_test_without_problem_definition(os.path.join(class_dir, class_file))
             try:
-                class_similarity_scores.append(distance(class_file_string, class_under_test_string))
+                class_similarity_scores.append(calculate_cosine_similarity(class_file_string, class_under_test_string))
             except Exception as e:
                 class_similarity_scores.append(1000)
                 
@@ -244,7 +255,7 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
         # Calculate similarity scores between the class under test and all other classes
         for class_file in class_files:
             class_file_string = get_python_file_content(os.path.join(class_dir, class_file))
-            class_similarity_scores.append(distance(class_file_string, class_under_test_string))
+            class_similarity_scores.append(calculate_cosine_similarity(class_file_string, class_under_test_string))
 
         # Get indexes of the most similar classes
         most_similar_classes_indexes = sorted(range(len(class_similarity_scores)), key=lambda i: class_similarity_scores[i])[1:num_test_cases+1]
@@ -274,8 +285,8 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
             class_file_string = get_test_without_problem_definition(os.path.join(class_dir, class_file))
             score = 0
             try:
-                score += distance(class_file_problem_definition, problem_definition)
-                score += distance(class_file_string, class_under_test_string)
+                score += calculate_cosine_similarity(class_file_problem_definition, problem_definition)
+                score += calculate_cosine_similarity(class_file_string, class_under_test_string)
             except Exception as e:
                 score = 10000
             class_similarity_scores.append(score)
@@ -292,12 +303,14 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
         n = min(num_test_cases, len(test_cases))
         selected_test_cases = random.sample(test_cases, k=n)
 
-    return "\n\n".join(selected_test_cases)
+    return selected_test_cases
 
 
 if __name__ == "__main__":
     # delete_python_files("tmp/human-eval/tests/human-written")
-    copy_python_files("data/human-eval/tests/human-written", "tmp/human_eval/tests/human-written")
-    # chosen_test_cases = choose_fewshot_example_test_cases("problem_and_class_similarity", "tmp/human-eval/tests/chatgpt", "HumanEval_5.py", 2)
+    # copy_python_files("data/human_eval/tests/human_written", "tmp/human_eval/tests/human_written")
+    chosen_test_cases = choose_fewshot_example_test_cases("class_similarity_with_definition", "tmp/human_eval/tests/human_written", "HumanEval_5.py", 2)
+    for test_case in chosen_test_cases:
+        print(test_case)
     pass
 
