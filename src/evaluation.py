@@ -39,7 +39,8 @@ def evaluate_project_directory(project_name, directory_path=None):
         print("Error retrieving SonarQube results.")
         return None
     else:
-        print("SonarQube Result:\n" + formated_results)
+        print("SonarQube Result:")
+        print(json.dumps(formated_results, indent=4))
         return formated_results
 
 
@@ -142,7 +143,7 @@ def format_sonarqube_results(results):
             elif "period" in measure:
                 metrics[measure["metric"]] = measure["period"]["value"]
         
-        return json.dumps(metrics, indent=4)
+        return metrics
     except Exception as e:
         print("Error formatting SonarQube results:", e)
         return None

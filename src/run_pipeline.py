@@ -95,7 +95,7 @@ def run_full_pipeline(project_name):
                     batch_requests.append(new_batch_request)
                     use_gpt.save_batch_requests(batch_requests)
                 else:
-                    batch.continue_processing(submit_job=False) # Change to True when everything is ready!
+                    batch.continue_processing(submit_job=True)
                     batch_status = batch.check_status()
                     
                     # If the batch is completed, continue processing - extract the results
@@ -133,7 +133,7 @@ def run_full_pipeline(project_name):
 
 if __name__ == "__main__":
     # run_specific_project_evaluation("human_eval", {"ctx": "initial", "test_source": "human-written", "target": "full_repository"})
-    # ensure_initial_test_suite_correctness("human_eval", "human_written")
+    # ensure_initial_test_suite_correctness("human_eval", "pynguin")
 
     run_full_pipeline("human_eval")
 

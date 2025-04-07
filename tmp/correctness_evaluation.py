@@ -62,7 +62,6 @@ def extract_function_name(test_path, module_name):
         
         pattern = r'^def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\('
         matches = re.findall(pattern, module_source_code, re.MULTILINE)
-        print(matches)
         return matches
 
 
