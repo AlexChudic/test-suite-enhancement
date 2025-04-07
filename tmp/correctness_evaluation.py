@@ -36,11 +36,11 @@ def check_correctness(test_case_path):
         
         if report.get("tests", []) != []:
             passed = sum(1 for test in report.get("tests", []) if test["outcome"] == "passed")
-            failed = sum(1 for test in report.get("tests", []) if test["outcome"] == "failed")
+            failed = sum(1 for test in report.get("tests", []) if test["outcome"] == "failed" or test["outcome"] == "xfailed")
             errored = sum(1 for test in report.get("tests", []) if test["outcome"] == "error")
             return (f"{passed} tests passed, {failed} tests failed, {errored} tests errored", None)
         else:
-            msg = [it["longrepr"] for it in report.get("collectors") if it["outcome"] == "failed"]
+            msg = [it["longrepr"] for it in report.get("collectors") if it["outcome"] == "failed" or it["outcome"] == "xfailed"]
             if msg:
                 msg = "\n".join(msg)
                 return ("Compilation Error", msg)
@@ -185,7 +185,8 @@ def rule_based_repair(test_case_path, error_msg, test_class, output):
 
     # RULE 3: Add missing module import statement
     module_import = f"from {module_name} import {', '.join(function_names)}"
-    if module_import not in test_class_source_code and function_names != []:
+    pynguin_import = f"import {module_name} as module_0"
+    if module_import not in test_class_source_code and function_names != [] and pynguin_import not in test_class_source_code:
         print("Applying Rule 3: Adding missing module import statement...")
         test_class_source_code = module_import + "\n" + test_class_source_code
         output["repair_stats"]["rule_3"].append(test_class)
@@ -210,7 +211,7 @@ def get_failing_tests(report_path):
     failed_tests = [
         test["nodeid"].split("::")[-1]
         for test in report.get("tests", [])
-        if test.get("outcome") == "failed"
+        if test.get("outcome") == "failed" or test.get("outcome") == "xfailed"
     ]
 
     return failed_tests
@@ -240,6 +241,7 @@ def remove_failing_tests(test_case_path, res, test_class, output):
         output["repair_stats"]["removed_tests_error"].append((test_class, len(error_tests)))
 
     failing_tests += error_tests
+    print(failing_tests)
     remove_functions(test_case_path, failing_tests)
     
     
@@ -259,6 +261,11 @@ def remove_functions(test_case_path, functions_to_remove):
         if any(f"def {fn}(" in stripped for fn in functions_to_remove):
             skip = True
             leading_spaces = lines[i].index(stripped)
+
+            # Remove the functoin decorator if it exists
+            if lines[i-1].strip().startswith(("@", "#")):
+                new_lines.pop()
+
             continue 
 
         # If we're skipping, check if a new function is starting
@@ -399,7 +406,7 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
     }
 
     for test_class in test_classes:
-        # if test_class not in ["test_HumanEval_32.py", "test_HumanEval_50.py", "test_HumanEval_107.py"]:
+        # if test_class not in ["test_HumanEval_98.py"]:
         #     continue
 
         # Evaluate the test class correctness
@@ -482,6 +489,6 @@ def print_file(path):
 
 if __name__ == "__main__":
     print("CORRECTNESS EVALUATION RESULTS:")
-    print(evaluate_functional_correctness("data/human_eval/tests/chatgpt/enhanced") )
+    print(evaluate_functional_correctness("tmp/human_eval/tests/pynguin/") )
 
     # get_class_under_test_coverage_metrics("tmp/human_eval/tests/chatgpt/test_HumanEval_107.py")
