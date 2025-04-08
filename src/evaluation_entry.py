@@ -155,12 +155,12 @@ class EvaluationEntry:
         """Generate a unique evaluation ID."""
         eval_id = ""
         if self.type == "initial":
-            eval_id = "_".join([
+            eval_id = "/".join([
                 str(self.get_evalId_number(True)),
                 self.get_test_source()
             ]).lower()
         else:
-            eval_id = "_".join([
+            eval_id = "/".join([
                 str(self.get_evalId_number(True)),
                 self.get_test_source(),
                 self.identifiers["test_selection_mode"],
@@ -182,7 +182,7 @@ class EvaluationEntry:
                 lines = f.readlines()
                 return len(lines)
         else:
-            return int(self.eval_id.split("_")[0])
+            return int(self.eval_id.split("/")[0])
             
     def get_project_name(self):
         return self.identifiers["project_name"]
@@ -247,6 +247,8 @@ class EvaluationEntry:
         test_source_data = {
             "eval_id" : self.eval_id,
             "test_source": self.identifiers["test_source"],
+            "num_test_cases" : self.identifiers["num_test_cases"] if "num_test_cases" in self.identifiers else None,
+            "test_selection_mode" : self.identifiers["test_selection_mode"] if "test_selection_mode" in self.identifiers else None,
             "total_classes" : correctnes_data["correctness_eval_counts"]["stats_pre_repair"]["total_classes"],
             "total_tests" : total_tests,
 
@@ -302,14 +304,14 @@ class EvaluationEntry:
         
         # Insert the corruption_data into rule_2
         if "corruption_data" in self.eval_data:
-            test_source_data["rule_2_repair_count"] = self.eval_data["corruption_data"]["corrupted_output"]["stats_post_repair"]["failed_tests"]
+            test_source_data["rule_2_repair_count"] = self.eval_data["corruption_data"]["corrupted_output"]
         
         # Convert the lists into a string
         for key in test_source_data:
             if isinstance(test_source_data[key], list):
                 test_source_data[key] = ';'.join(map(str, test_source_data[key]))
         
-        print(test_source_data)
+        # print(test_source_data)
         df = pd.DataFrame(test_source_data, index=[0])
         return df
     
