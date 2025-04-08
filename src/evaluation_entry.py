@@ -1,5 +1,6 @@
 import json
 import os
+import pandas as pd
 import src.utility_functions as uf
 import src.evaluation as eval
 import tmp.correctness_evaluation as correctness_evaluation
@@ -238,6 +239,79 @@ class EvaluationEntry:
     def get_json_path(self):
         return EvaluationEntry.get_type_json_path(self.type, self.get_project_name())
     
+    def get_eval_entry_csv(self):
+        correctnes_data = self.eval_data["correctness_evaluation"]
+        eval_data_project = self.eval_data["enhanced_project_evaluation"]
+        eval_data_test = self.eval_data["enhanced_test_evaluation"]
+        total_tests = correctnes_data["correctness_eval_counts"]["stats_post_removal"]["passed_tests"] + correctnes_data["correctness_eval_counts"]["stats_post_repair"]["failed_tests"]
+        test_source_data = {
+            "eval_id" : self.eval_id,
+            "test_source": self.identifiers["test_source"],
+            "total_classes" : correctnes_data["correctness_eval_counts"]["stats_pre_repair"]["total_classes"],
+            "total_tests" : total_tests,
+
+            # Correctness stats
+            "passed" : correctnes_data["correctness_eval_counts"]["stats_pre_repair"]["passed_tests"],
+            "passed_after_repair" : correctnes_data["correctness_eval_counts"]["stats_post_removal"]["passed_tests"],
+            "syntax_errors" : correctnes_data["correctness_eval_counts"]["stats_pre_repair"]["syntax_errors"],
+            "syntax_errors_after_repair" : correctnes_data["correctness_eval_counts"]["stats_post_removal"]["syntax_errors"],
+            "compilation_errors" : correctnes_data["correctness_eval_counts"]["stats_pre_repair"]["compilation_errors"],
+            "compilation_errors_after_repair" : correctnes_data["correctness_eval_counts"]["stats_post_removal"]["compilation_errors"],
+            "no_test_classes_after_repair" : correctnes_data["correctness_eval_counts"]["stats_post_removal"]["no_tests_classes"],
+            
+            # Repair stats
+            "rule_1_repair_count": total_tests,
+            "rule_2_repair_count": 0,
+            "rule_3_repair_count": len(correctnes_data["repair_stats"]["rule_2"]),
+            "rule_3_repaired_tests": correctnes_data["repair_stats"]["rule_2"],
+            "rule_4_repair_count": len(correctnes_data["repair_stats"]["rule_3"]),
+            "rule_4_repaired_tests": correctnes_data["repair_stats"]["rule_3"],
+            "rule_5_repair_count": len(correctnes_data["repair_stats"]["rule_5"]),
+            "rule_5_repaired_tests": correctnes_data["repair_stats"]["rule_5"],
+            "rule_6_repair_count": len(correctnes_data["repair_stats"]["rule_4"]),
+            "rule_6_repaired_tests": correctnes_data["repair_stats"]["rule_4"],
+            "rule_7_repair_count": len(correctnes_data["repair_stats"]["rule_0"]),
+            "rule_7_repaired_tests": correctnes_data["repair_stats"]["rule_0"],
+            "rule_8_repair_count": len(correctnes_data["repair_stats"]["rule_1"]),
+            "rule_8_repaired_tests": correctnes_data["repair_stats"]["rule_1"],
+
+            # Coverage stats
+            "coverage" : eval_data_project["coverage"],
+            "branch_coverage" : eval_data_project["branch_coverage"],
+            "line_coverage" : eval_data_project["line_coverage"],
+            "lines_to_cover" : eval_data_project["lines_to_cover"],
+            "uncovered_lines" : eval_data_project["uncovered_lines"],
+
+            # Test quality stats
+            "lines" : eval_data_test["lines"],
+            "non_comment_lines" : eval_data_test["ncloc"],
+            "comment_lines" : eval_data_test["comment_lines"],
+            "cognitive_complexity" : eval_data_test["cognitive_complexity"],
+            "cyclomatic_complexity" : eval_data_test["complexity"],
+            "squale_index" : eval_data_test["sqale_index"],
+            "code_smells" : eval_data_test["code_smells"],
+            "bugs" : eval_data_test["bugs"],
+            "vulnerabilities" : eval_data_test["vulnerabilities"],
+        }
+
+        # Calculate additional metrics
+        test_source_data["syntactically_correct"] = test_source_data["total_classes"] - test_source_data["syntax_errors"]
+        test_source_data["syntactically_correct_after_repair"] = test_source_data["total_classes"] - test_source_data["syntax_errors_after_repair"]
+        test_source_data["compilable"] = test_source_data["total_classes"] - test_source_data["compilation_errors"]
+        test_source_data["compilable_after_repair"] = test_source_data["total_classes"] - test_source_data["compilation_errors_after_repair"]
+        
+        # Insert the corruption_data into rule_2
+        if "corruption_data" in self.eval_data:
+            test_source_data["rule_2_repair_count"] = self.eval_data["corruption_data"]["corrupted_output"]["stats_post_repair"]["failed_tests"]
+        
+        # Convert the lists into a string
+        for key in test_source_data:
+            if isinstance(test_source_data[key], list):
+                test_source_data[key] = ';'.join(map(str, test_source_data[key]))
+        
+        print(test_source_data)
+        df = pd.DataFrame(test_source_data, index=[0])
+        return df
     
     def __str__(self):
         return json.dumps(self.to_json())
