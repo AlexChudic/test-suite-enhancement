@@ -308,9 +308,9 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
 
 if __name__ == "__main__":
     # delete_python_files("tmp/human-eval/tests/human-written")
-    # copy_python_files("data/human_eval/tests/human_written", "tmp/human_eval/tests/human_written")
-    chosen_test_cases = choose_fewshot_example_test_cases("class_similarity_with_definition", "tmp/human_eval/tests/human_written", "HumanEval_5.py", 2)
-    for test_case in chosen_test_cases:
-        print(test_case)
+    copy_python_files("data/human_eval/tests/pynguin", "tmp/human_eval/tests/pynguin")
+    # chosen_test_cases = choose_fewshot_example_test_cases("class_similarity_with_definition", "tmp/human_eval/tests/human_written", "HumanEval_5.py", 2)
+    # for test_case in chosen_test_cases:
+    #     print(test_case)
     pass
 

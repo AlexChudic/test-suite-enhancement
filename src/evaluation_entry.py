@@ -9,10 +9,11 @@ EVALUATION_DIR="data/eval/"
 
 class EvaluationEntry:
 
-    def __init__(self, batch_id, identifiers={}, eval_data={}, eval_id=None, status="initial", timestamp=None, is_loaded_from_json=False):
+    def __init__(self, batch_id:str, type:str, identifiers={}, eval_data={}, eval_id=None, status="initial", timestamp=None, is_loaded_from_json=False):
         """Initialize the EvaluationEntry object."""
 
         self.batch_id = batch_id
+        self.type = type
         self.identifiers = identifiers
         self.eval_data = eval_data
         self.status = status
@@ -25,7 +26,7 @@ class EvaluationEntry:
             self.eval_id = eval_id
 
         if not is_loaded_from_json:
-            print("NEW Evaluation entry created!")
+            print(f"NEW {type.capitalize()} evaluation entry created!")
             print(self.to_json())
             self.save(new=True)
         else:
@@ -38,6 +39,7 @@ class EvaluationEntry:
         """Alternative constructor for loading from a dictionary file."""
         return cls(
             eval_data["batch_id"],
+            eval_data["type"],
             eval_data["identifiers"],
             eval_data["eval_data"],
             eval_data["eval_id"],
@@ -47,12 +49,13 @@ class EvaluationEntry:
         )
     
     @classmethod
-    def get_eval_entry(cls, batch_id, project_name):
+    def get_eval_entry(cls, batch_id, type, project_name):
         """Check if an evaluation entry exists."""
-        if not os.path.exists(os.path.join(EVALUATION_DIR, f"{project_name}.jsonl")):
+        path = cls.get_type_json_path(type, project_name)
+        if not os.path.exists(path):
             return None
         
-        eval_entries = cls.load_all(project_name)
+        eval_entries = cls.load_all(type, project_name)
         for entry in eval_entries:
             if entry.batch_id == batch_id:
                 return entry
@@ -60,12 +63,13 @@ class EvaluationEntry:
             return None
     
     @classmethod
-    def load_all(cls, project_name):
+    def load_all(cls, type, project_name):
         """Load all evaluation entries for a project."""
-        if not os.path.exists(os.path.join(EVALUATION_DIR, f"{project_name}.jsonl")):
-            return []
+        json_path = cls.get_type_json_path(type, project_name)
+        if not os.path.exists(json_path):
+            return None
         
-        with open(os.path.join(EVALUATION_DIR, f"{project_name}.jsonl"), "r") as file:
+        with open(json_path, "r") as file:
             entries = []
             for line in file:
                 entry_data = json.loads(line)
@@ -120,6 +124,8 @@ class EvaluationEntry:
                 project_name = self.get_project_name()
                 test_source = self.get_test_source()
                 
+                # WTF: Why is the test_source not in the path? 
+                # Actually, what is this copy even for?
                 uf.copy_python_files(f"data/{project_name}/tests/", f"tmp/{project_name}/tests/{test_source}")
                 
                 # First evaluate the full project to get code coverage
@@ -144,18 +150,21 @@ class EvaluationEntry:
             print("Skipping enhanced evaluation - not in state=corrected")
             
 
-
     def generate_eval_id(self):
         """Generate a unique evaluation ID."""
-
-        eval_id = "_".join([
-            str(self.get_evalId_number(True)),
-            self.get_test_source(),
-            self.identifiers["test_selection_mode"],
-            str(self.identifiers["num_test_cases"]),
-            self.identifiers["model_name"].replace("-", "_"),
-            str(self.identifiers["temperature"]).replace(".", "_")
-        ]).lower()
+        eval_id = ""
+        if self.type == "initial":
+            eval_id = "_".join([
+                str(self.get_evalId_number(True)),
+                self.get_test_source()
+            ]).lower()
+        else:
+            eval_id = "_".join([
+                str(self.get_evalId_number(True)),
+                self.get_test_source(),
+                self.identifiers["test_selection_mode"],
+                str(self.identifiers["num_test_cases"])
+            ]).lower()
 
         return eval_id
     
@@ -180,6 +189,7 @@ class EvaluationEntry:
     def get_test_source(self):
         return self.identifiers["test_source"]
 
+
     def save(self, new=False):
         """Save the evaluation entry to a JSON file."""
         if not os.path.exists(EVALUATION_DIR):
@@ -201,14 +211,16 @@ class EvaluationEntry:
                 file.write(json.dumps(self.to_json()) + "\n")
             print(f"Evaluation entry saved! Eval ID: {self.eval_id}, Status: {self.get_status()}")
 
+
     def to_json(self):
         """Convert the object to a JSON dictionary."""
         return {
             "eval_id": self.eval_id,
+            "type": self.type,
+            "status": self.status,
             "batch_id": self.batch_id,
             "identifiers": self.identifiers,
             "eval_data": self.eval_data,
-            "status": self.status,
             "timestamp": self.timestamp
         }    
 
@@ -216,8 +228,16 @@ class EvaluationEntry:
         """Check the status of the evaluation."""
         return self.status
     
+    @classmethod
+    def get_type_json_path(cls, type, project_name):
+        if type == "enhanced":
+            return os.path.join(EVALUATION_DIR, f"{project_name}.jsonl")
+        else:
+            return os.path.join(EVALUATION_DIR, f"{project_name}_{type}.jsonl")
+        
     def get_json_path(self):
-        return os.path.join(EVALUATION_DIR, f"{self.identifiers['project_name']}.jsonl")
+        return EvaluationEntry.get_type_json_path(self.type, self.get_project_name())
+    
     
     def __str__(self):
         return json.dumps(self.to_json())

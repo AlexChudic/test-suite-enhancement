@@ -1,5 +1,5 @@
 import src.evaluation as ev
-import src.utility_functions as utility
+import src.utility_functions as uf
 import src.use_gpt_in_batches as use_gpt
 from src.batch_request import BatchRequest
 from src.evaluation_entry import EvaluationEntry
@@ -13,14 +13,14 @@ load_dotenv(override=True)
 
 def ensure_initial_test_suite_correctness(project_name, test_source):
     """Ensure the initial test suite is correct - if not, apply rule-based repair"""
-    utility.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
+    uf.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
 
     test_suite_path = f"tmp/{project_name}/tests/{test_source}/"
     res = correctness_evaluation.evaluate_functional_correctness(test_suite_path)
 
-    utility.copy_python_files(f"tmp/{project_name}/tests/{test_source}", f"data/{project_name}/tests/{test_source}")
-    utility.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
-    utility.delete_repository(f"tmp/{project_name}/tests/{test_source}")
+    uf.copy_python_files(f"tmp/{project_name}/tests/{test_source}", f"data/{project_name}/tests/{test_source}")
+    uf.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
+    uf.delete_repository(f"tmp/{project_name}/tests/{test_source}")
 
     with open(f"data/{project_name}/tests/{test_source}/correctness_evaluation.json", "w") as file:
         json.dump(res, file, indent=4)
@@ -29,30 +29,52 @@ def ensure_initial_test_suite_correctness(project_name, test_source):
 
 def run_initial_project_evaluations(project_name):
     print(f"Running initial evaluations for project: {project_name}\n")
-    ev.evaluate_project_directory(project_name)
     
-    for test_source in ["human-written", "pynguin", "chatgpt"]:
+    for test_source in ["human_written", "pynguin", "chatgpt"]:
+        eval_metrics = {}
+        
+        # Get the correctness metrics from the json file
+        correctness_metrics_path = f"data/{project_name}/tests/{test_source}/correctness_evaluation.json" 
+        
+        if not os.path.exists(correctness_metrics_path):
+            print(f"Correctness metrics file not found for {test_source}. Skipping initial evaluation.")
+            continue
+        
+        with open(correctness_metrics_path, "r") as file:
+            correctness_metrics = json.load(file)
+            eval_metrics["correctness_evaluation"] = correctness_metrics
+
+        # Perform the test suite evaluation
         print(f"Running initial evaluations for project: {project_name} with test source: {test_source}\n")
-        utility.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
-        ev.evaluate_project_directory(project_name)
-        ev.evaluate_project_directory(project_name, directory_path=f"tests/{test_source}")
-        utility.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
-        utility.delete_repository(f"tmp/{project_name}/tests/{test_source}")
+        uf.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
 
+        # First evaluate the full project to get code coverage
+        project_eval_metrics = ev.evaluate_project_directory(project_name)
+        eval_metrics["enhanced_project_evaluation"] = project_eval_metrics
+        print(f"Project evaluation metrics:\n{project_eval_metrics}")
 
-def run_single_eval_setting():
-    # STEP 1: Run the test correctness evaluation
-        # Ensure the tests are working correctly
-        # Apply Rule-based repair if not
-        # Ensure the tests improve the coverage
-    # STEP 2: Run the initial project evaluations - using the example tests only
-        # Evaluate full project to get code coverage
-        # Evaluate test directory to get code quality metrics
-    # STEP 3: Run the specific project evaluation - with the enhanced test suite
-        # Evaluate full project to get code coverage
-        # Evaluate test directory to get code quality metrics
-    # STEP 4: Save the eval_entry to the JSON file
-    pass
+        # Then evaluate the test directory to get code quality metrics
+        test_eval_metrics = ev.evaluate_project_directory(project_name, directory_path=f"tests/{test_source}")
+        eval_metrics["enhanced_test_evaluation"] = test_eval_metrics
+        print(f"Test evaluation metrics:\n{test_eval_metrics}")
+        
+        uf.delete_python_files(f"tmp/{project_name}/tests/{test_source}")
+        uf.delete_repository(f"tmp/{project_name}/tests/{test_source}")
+
+        # Save the evaluation metrics to a EvaluationEntry
+        identifiers = {
+            "project_name": project_name,
+            "job_type" : "initial_test_suite_evaluation",
+            "test_source": test_source,
+        }
+        eval_entry = EvaluationEntry(
+            batch_id="",
+            type="initial",
+            identifiers=identifiers,
+            eval_data=eval_metrics,
+            status="evaluated"
+        )
+        eval_entry.save()
 
 
 def run_full_pipeline(project_name):
@@ -65,7 +87,7 @@ def run_full_pipeline(project_name):
     num_test_cases = [1, 3, 5]
 
     for test_source in sources:
-
+        
         for example_selection_mode in example_selection_modes:
             for num_test_case in num_test_cases:
                 identifiers = {
@@ -83,7 +105,7 @@ def run_full_pipeline(project_name):
                 batch = use_gpt.get_batch_request(identifiers, batch_requests)
                 if not batch:
                     # If batch does not exist, create a new one
-                    identifier_string = utility.generate_identifier_string(identifiers)
+                    identifier_string = uf.generate_identifier_string(identifiers)
                     new_batch_request = BatchRequest(
                         f"data/{project_name}/tests/{test_source}/enhanced/{identifier_string}",
                         f"tmp/{project_name}/tests/{test_source}",
@@ -114,7 +136,7 @@ def run_full_pipeline(project_name):
                 # If batch is processed, run the specific project evaluation
                 if processed:
                     print("Evaluating the batch request... " + str(batch.batch_id))
-                    eval_entry = EvaluationEntry.get_eval_entry(batch.batch_id, project_name)
+                    eval_entry = EvaluationEntry.get_eval_entry(batch.batch_id, "enhanced", project_name)
                     if eval_entry:
                         eval_entry.run_correctness_evaluation()
                         eval_entry.run_enhanced_evaluation()
@@ -124,6 +146,7 @@ def run_full_pipeline(project_name):
                         }
                         eval_entry = EvaluationEntry(
                             batch.batch_id,
+                            "enhanced",
                             identifiers,
                             eval_data
                         )
@@ -132,12 +155,12 @@ def run_full_pipeline(project_name):
                         
 
 if __name__ == "__main__":
-    # run_specific_project_evaluation("human_eval", {"ctx": "initial", "test_source": "human-written", "target": "full_repository"})
     # ensure_initial_test_suite_correctness("human_eval", "pynguin")
+    # run_initial_project_evaluations("human_eval")
 
     run_full_pipeline("human_eval")
 
     # data_test_path = f"data/human_eval/tests/human_written/enhanced/human_written_random_from_all_5/"
     # tmp_test_path = f"tmp/human_eval/tests/human_written/"
-    # utility.copy_python_files(data_test_path, tmp_test_path)
+    # uf.copy_python_files(data_test_path, tmp_test_path)
 
