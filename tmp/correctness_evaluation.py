@@ -7,6 +7,7 @@ import ast
 import compileall
 import importlib.util
 from pathlib import Path
+import src.utility_functions as uf
 
 def check_correctness(test_case_path):
     """Evaluates the correctness of a test case."""
@@ -139,6 +140,33 @@ def remove_self_from_standalone_functions(test_class_source_code, file):
         new_lines.append(line)
         i += 1
     test_class_source_code = '\n'.join(new_lines)
+
+
+def remove_empty_class_definition(test_class_path):
+    with open(test_class_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    output_lines = []
+    skip_mode = False
+
+    for i, line in enumerate(lines):
+        if not skip_mode:
+            class_match = re.match(r'^\s*class\s+\w+\s*(\(.*\))?\s*:\s*$', line)
+            if class_match:
+                # Check if next line exists and is indented (a body exists)
+                if i + 1 >= len(lines) or not re.match(r'^\s{4,}|\t+', lines[i + 1]):
+                    # No body or improperly indented => skip this class
+                    skip_mode = True
+                    continue
+        else:
+            # If we're in skip mode, continue until we hit a non-indented line or EOF
+            if i >= len(lines) or not re.match(r'^\s{4,}|\t+', line):
+                skip_mode = False
+                output_lines.append(line)
+        if not skip_mode:
+            output_lines.append(line)
+
+    with open(test_class_path, "w", encoding="utf-8") as f:
+        f.write(''.join(output_lines))
 
 
 def rule_based_repair(test_case_path, error_msg, test_class, output):
@@ -376,6 +404,17 @@ def optimise_test_suite_effectiveness(test_case_path, enhanced_test_case_path, t
     pass # TODO: implement this function!!
 
 
+def cleanup_no_unit_test_class(test_class_path):
+    with open(test_class_path, "r", encoding="utf-8") as f:
+        source_code = f.read()
+    if "class" in source_code:
+        # CLEANUP: Remove the class definition
+        source_code = re.sub(r"class\s+\w+\s*:\s*", "", source_code)
+
+    with open(test_class_path, "w", encoding="utf-8") as f:
+        f.write(source_code)
+    
+
 def evaluate_functional_correctness(path, effectiveness_optimization=False, enhanced_test_suite_path=None):
     test_classes = [f for f in os.listdir(path) if f.endswith(".py")]
     stats_pre_repair = {
@@ -406,7 +445,7 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
     }
 
     for test_class in test_classes:
-        # if test_class not in ["test_HumanEval_98.py"]:
+        # if test_class not in ["test_HumanEval_160.py"]:
         #     continue
 
         # Evaluate the test class correctness
@@ -431,6 +470,11 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
             # Remove the tests that are still failing
             if not passed:
                 remove_failing_tests(test_class_path, res, test_class, output)
+                remove_empty_class_definition(test_class_path)
+
+                # class_test_cases = uf.extract_test_cases_from_file(test_class_path)
+                # if len(class_test_cases) == 0:
+                #     cleanup_no_unit_test_class(class_test_cases)
 
         # Evaluate the test class correctness again
         res = check_correctness(test_class_path)
