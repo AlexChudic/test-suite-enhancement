@@ -145,25 +145,41 @@ def remove_self_from_standalone_functions(test_class_source_code, file):
 def remove_empty_class_definition(test_class_path):
     with open(test_class_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
-    output_lines = []
-    skip_mode = False
 
-    for i, line in enumerate(lines):
-        if not skip_mode:
-            class_match = re.match(r'^\s*class\s+\w+\s*(\(.*\))?\s*:\s*$', line)
-            if class_match:
-                # Check if next line exists and is indented (a body exists)
-                if i + 1 >= len(lines) or not re.match(r'^\s{4,}|\t+', lines[i + 1]):
-                    # No body or improperly indented => skip this class
-                    skip_mode = True
+    output_lines = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        class_match = re.match(r'^(\s*)class\s+\w+\s*(\(.*\))?\s*:\s*$', line)
+        if class_match:
+            indent = class_match.group(1)
+            class_block = [line]
+            i += 1
+
+            # Collect class body
+            while i < len(lines):
+                next_line = lines[i]
+                print("Next line = " + next_line )
+                if next_line.strip() == "":
+                    class_block.append(next_line)
+                    i += 1
                     continue
+                if next_line.startswith(indent + "    ") or next_line.startswith(indent + "\t"):
+                    class_block.append(next_line)
+                    i += 1
+                else:
+                    print("Class block = " + "".join(class_block))
+                    break
+
+            # If there are no functions, remove the class block
+            has_function = any(re.match(r'^\s*def\s+\w+\s*\(', l) for l in class_block)
+            if not has_function: 
+                continue
+            else:
+                output_lines.extend(class_block)
         else:
-            # If we're in skip mode, continue until we hit a non-indented line or EOF
-            if i >= len(lines) or not re.match(r'^\s{4,}|\t+', line):
-                skip_mode = False
-                output_lines.append(line)
-        if not skip_mode:
             output_lines.append(line)
+            i += 1
 
     with open(test_class_path, "w", encoding="utf-8") as f:
         f.write(''.join(output_lines))
@@ -201,13 +217,16 @@ def rule_based_repair(test_case_path, error_msg, test_class, output):
         new_lines = []
         missing_module = re.search(r"ModuleNotFoundError: No module named '(\w+)'", error_msg).group(1)
         for line in test_class_source_code.split("\n"):
-            if missing_module in line:
+            if f"import {missing_module}" in line or f"from {missing_module}" in line:
+                if missing_module == "module_0":
+                    class_under_test = test_class.replace(".py", "").removeprefix("test_")
+                    new_lines.append(f"import {class_under_test} as module_0")
                 continue
             new_lines.append(line)
         test_class_source_code = "\n".join(new_lines)
         output["repair_stats"]["rule_5"].append(test_class)
 
-    # RULE 6: SyntaxError
+    # RULE 6: Removing test cases with SyntaxErrors
     if error_msg and type(error_msg) == SyntaxError:
         print("Applying Rule 6: Removing test causing SyntaxError...")
         syntax_error_line = error_msg.lineno
@@ -215,6 +234,14 @@ def rule_based_repair(test_case_path, error_msg, test_class, output):
         test_class_source_code = remove_functions(test_case_path, [syntax_error_test_case])
         output["repair_stats"]["rule_6"].append(test_class)
         
+    # RULE7: Remove test cases with no compilable code - they are causing IndentationError
+    if error_msg and type(error_msg) == IndentationError:
+        print("Applying Rule 7: Removing test causing IndentationError...")
+        # The error in on the line of next function => just find the previous function by lineno-1
+        error_line = error_msg.lineno - 1
+        error_test_case = get_test_case_by_line(test_class_source_code, error_line)
+        test_class_source_code = remove_functions(test_case_path, [error_test_case])
+        output["repair_stats"]["rule_7"].append(test_class)
 
     # RULE 1: Add missing function names - only asserts are present
     has_function = bool(re.search(r"^\s*def test_", test_class_source_code, re.MULTILINE))
@@ -243,6 +270,7 @@ def rule_based_repair(test_case_path, error_msg, test_class, output):
     # RULE 3: Add missing module import statement
     module_import = f"from {module_name} import {', '.join(function_names)}"
     pynguin_import = f"import {module_name} as module_0"
+    print("Module import: ", module_import)
     if module_import not in test_class_source_code and function_names != [] and pynguin_import not in test_class_source_code:
         print("Applying Rule 3: Adding missing module import statement...")
         test_class_source_code = module_import + "\n" + test_class_source_code
@@ -319,9 +347,10 @@ def remove_functions(test_case_path, functions_to_remove):
             skip = True
             leading_spaces = lines[i].index(stripped)
 
-            # Remove the functoin decorator if it exists
+            # Remove the function decorator if it exists and is added to new_lines
             if lines[i-1].strip().startswith(("@", "#")):
-                if len(new_lines) > 0:
+                print(new_lines[len(new_lines)-1].strip())
+                if len(new_lines) > 0 and new_lines[len(new_lines)-1].strip().startswith(("@", "#")):
                     new_lines.pop()
 
             continue 
@@ -469,6 +498,7 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
             "rule_4": [],
             "rule_5": [],
             "rule_6": [],
+            "rule_7": [],
             "removed_tests_failing": [],
             "removed_tests_error": [],
             "removed_tests_not_improved_coverage": [],
@@ -477,8 +507,8 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
     }
 
     for test_class in test_classes:
-        # if test_class not in ["test_HumanEval_6.py"]:
-        #     continue
+        if test_class not in ["test_HumanEval_116.py"]:
+            continue
 
         # Evaluate the test class correctness
         test_class_path = os.path.join(path, test_class)
@@ -565,6 +595,6 @@ def print_file(path):
 
 if __name__ == "__main__":
     print("CORRECTNESS EVALUATION RESULTS:")
-    print(evaluate_functional_correctness("tmp/human_eval/tests/human_written/") )
+    print(evaluate_functional_correctness("tmp/human_eval/tests/pynguin/") )
 
     # get_class_under_test_coverage_metrics("tmp/human_eval/tests/chatgpt/test_HumanEval_107.py")
