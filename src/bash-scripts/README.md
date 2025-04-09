@@ -2,7 +2,7 @@
 The Bash helper scripts in this folder help with running different parts of the pipeline. You can find the description of each of them and the run guide below.
 
 ## evaluate-repository.sh
-This Bash script runs the Sonarqube evalution using the sonar_token provided. The script is used in the evaluation.py to trigger the evaluation of the evaluated folder.
+This Bash script runs the Sonarqube evalution using the sonar_token provided. The script is used in the evaluation.py to trigger the evaluation of the evaluated folder. When running the scipts make sure to set the java version to openjdk 17 and include the project tmp directory in your PYTHON_PATH. This can be done by running `export PYTHONPATH="/<path-to-directory>/test-suite-enhancement/tmp/human_eval"`
 
 Can be run in command line from root using command `/bin/bash ./evaluate-repository.sh <path-to-project> <sonar_token>`
     - <path-to-project> - takes the path to evaluated folder tmp/ which we want to evaluate
