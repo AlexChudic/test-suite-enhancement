@@ -169,6 +169,26 @@ def remove_empty_class_definition(test_class_path):
         f.write(''.join(output_lines))
 
 
+def get_test_case_by_line(source_code, line_number):
+    lines = source_code.splitlines()
+    function_positions = []
+
+    for idx, line in enumerate(lines):
+        match = re.match(r'^\s*def\s+(test_\w+)\s*\(', line)
+        if match:
+            function_name = match.group(1)
+            function_positions.append((idx + 1, function_name))  # Line numbers are 1-based
+
+    current_function = None
+    for i, (start_line, name) in enumerate(function_positions):
+        end_line = function_positions[i + 1][0] - 1 if i + 1 < len(function_positions) else len(lines)
+        if start_line <= line_number <= end_line:
+            current_function = name
+            break
+
+    return current_function
+
+
 def rule_based_repair(test_case_path, error_msg, test_class, output):
     """Attempts to repair a test case using a rule-based approach."""
 
@@ -186,6 +206,15 @@ def rule_based_repair(test_case_path, error_msg, test_class, output):
             new_lines.append(line)
         test_class_source_code = "\n".join(new_lines)
         output["repair_stats"]["rule_5"].append(test_class)
+
+    # RULE 6: SyntaxError
+    if error_msg and type(error_msg) == SyntaxError:
+        print("Applying Rule 6: Removing test causing SyntaxError...")
+        syntax_error_line = error_msg.lineno
+        syntax_error_test_case = get_test_case_by_line(test_class_source_code, syntax_error_line)
+        test_class_source_code = remove_functions(test_case_path, [syntax_error_test_case])
+        output["repair_stats"]["rule_6"].append(test_class)
+        
 
     # RULE 1: Add missing function names - only asserts are present
     has_function = bool(re.search(r"^\s*def test_", test_class_source_code, re.MULTILINE))
@@ -292,7 +321,8 @@ def remove_functions(test_case_path, functions_to_remove):
 
             # Remove the functoin decorator if it exists
             if lines[i-1].strip().startswith(("@", "#")):
-                new_lines.pop()
+                if len(new_lines) > 0:
+                    new_lines.pop()
 
             continue 
 
@@ -312,6 +342,7 @@ def remove_functions(test_case_path, functions_to_remove):
     # Write back cleaned file
     with open(test_case_path, "w") as f:
         f.writelines(new_lines)
+    return "".join(new_lines)
 
 
 def add_correction_evaluation_stats(stats, res):    
@@ -437,6 +468,7 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
             "rule_3": [],
             "rule_4": [],
             "rule_5": [],
+            "rule_6": [],
             "removed_tests_failing": [],
             "removed_tests_error": [],
             "removed_tests_not_improved_coverage": [],
@@ -445,7 +477,7 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
     }
 
     for test_class in test_classes:
-        # if test_class not in ["test_HumanEval_160.py"]:
+        # if test_class not in ["test_HumanEval_6.py"]:
         #     continue
 
         # Evaluate the test class correctness
@@ -533,6 +565,6 @@ def print_file(path):
 
 if __name__ == "__main__":
     print("CORRECTNESS EVALUATION RESULTS:")
-    print(evaluate_functional_correctness("tmp/human_eval/tests/pynguin/") )
+    print(evaluate_functional_correctness("tmp/human_eval/tests/human_written/") )
 
     # get_class_under_test_coverage_metrics("tmp/human_eval/tests/chatgpt/test_HumanEval_107.py")
