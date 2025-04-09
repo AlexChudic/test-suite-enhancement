@@ -77,14 +77,44 @@ def run_initial_project_evaluations(project_name):
         eval_entry.save()
 
 
-def run_full_pipeline(project_name):
+def redo_evaluation(project_name, eval_id):
+    eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
+    eval_entry.redo_evaluation()
+
+    # Rerun the evaluation with the settings
+    settings = {
+        "test_source": eval_entry.identifiers["test_source"],
+        "example_selection_mode": eval_entry.identifiers["test_selection_mode"],
+        "num_test_cases": eval_entry.identifiers["num_test_cases"]
+    }
+    # run_full_pipeline(project_name, test_settings=settings)
+
+def continue_evaluation(eval_id):
+    eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
+
+    # initial means that the batch request is not evaluated yet
+    if eval_entry.status == "initial":
+        eval_entry.run_correctness_evaluation()
+        eval_entry.run_enhanced_evaluation()
+        
+    # corrected means that run_correctness_evaluation has been run, but we need to evaluate the enhanced test suite
+    elif eval_entry.status == "corrected":
+        eval_entry.run_enhanced_evaluation()
+
+
+def run_full_pipeline(project_name, test_settings=None):
     client = OpenAI()
     batch_requests = use_gpt.load_batch_requests(client)
 
-    sources = ["human_written", "pynguin", "chatgpt"]
-    example_selection_modes = ["random_from_all", "random_from_class_under_test", "problem_similarity", "class_similarity_no_definition", 
-                               "class_similarity_with_definition", "problem_and_class_similarity"]
-    num_test_cases = [1, 3, 5]
+    if test_settings:
+        sources = [ test_settings["test_source"] ]
+        example_selection_modes = [ test_settings["example_selection_mode"] ]
+        num_test_cases = [ test_settings["num_test_cases"] ]
+    else:
+        sources = ["human_written", "pynguin", "chatgpt"]
+        example_selection_modes = ["random_from_all", "random_from_class_under_test", "problem_similarity", "class_similarity_no_definition", 
+                                "class_similarity_with_definition", "problem_and_class_similarity"]
+        num_test_cases = [1, 3, 5]
 
     for test_source in sources:
         
@@ -138,8 +168,27 @@ def run_full_pipeline(project_name):
                     print("Evaluating the batch request... " + str(batch.batch_id))
                     eval_entry = EvaluationEntry.get_eval_entry(batch.batch_id, "enhanced", project_name)
                     if eval_entry:
-                        eval_entry.run_correctness_evaluation()
-                        eval_entry.run_enhanced_evaluation()
+                        # initial means that the batch request is not evaluated yet
+                        if eval_entry.status == "initial":
+                            eval_entry.run_correctness_evaluation()
+                            eval_entry.run_enhanced_evaluation()
+                        
+                        # redo_evaluation is used when we want to re-evaluate the batch request
+                        elif eval_entry.status == "redo_evaluation":
+                            eval_data = {
+                                "corruption_data" : batch.get_corrupted_output_data()
+                            }
+                            eval_entry.eval_data = eval_data
+                            eval_entry.status = "initial"
+                            eval_entry.run_correctness_evaluation()
+                            eval_entry.run_enhanced_evaluation()
+                        
+                        # corrected means that run_correctness_evaluation has been run, but we need to evaluate the enhanced test suite
+                        elif eval_entry.status == "corrected":
+                            eval_entry.run_enhanced_evaluation()
+                            
+                        else: # eval_entry.status == "evaluated":
+                            pass
                     else:
                         eval_data = {
                             "corruption_data" : batch.get_corrupted_output_data()
@@ -164,3 +213,30 @@ if __name__ == "__main__":
     # tmp_test_path = f"tmp/human_eval/tests/human_written/"
     # uf.copy_python_files(data_test_path, tmp_test_path)
 
+    eval_ids = [
+        # "9/human_written/class_similarity_no_definition/1",
+        # "4/human_written/random_from_class_under_test/3",
+        # "5/human_written/random_from_class_under_test/5",
+        # "18/pynguin/random_from_all/1",
+        # "20/pynguin/random_from_all/5",
+        # "21/pynguin/random_from_class_under_test/1",
+        # "22/pynguin/random_from_class_under_test/3",
+        # "23/pynguin/random_from_class_under_test/5",
+        # "24/pynguin/problem_similarity/1",
+        # "25/pynguin/problem_similarity/3",
+        # "26/pynguin/problem_similarity/5",
+        # "27/pynguin/class_similarity_no_definition/1",
+        # "28/pynguin/class_similarity_no_definition/3",
+        # "29/pynguin/class_similarity_no_definition/5",
+        # "30/pynguin/class_similarity_with_definition/1",
+        # "31/pynguin/class_similarity_with_definition/3",
+        # "32/pynguin/class_similarity_with_definition/5",
+        # "33/pynguin/problem_and_class_similarity/1",
+        # "34/pynguin/problem_and_class_similarity/3",
+        # "35/pynguin/problem_and_class_similarity/5",
+        # "36/chatgpt/random_from_all/1",
+        # "38/chatgpt/random_from_all/5",
+    ]
+    # for eval_id in eval_ids:
+    #     redo_evaluation('human_eval', eval_id)
+    #     continue_evaluation(eval_id)

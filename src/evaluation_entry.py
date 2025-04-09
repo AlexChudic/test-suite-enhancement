@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import src.utility_functions as uf
 import src.evaluation as eval
+import src.use_gpt_in_batches as use_gpt
 import tmp.correctness_evaluation as correctness_evaluation
 from datetime import datetime
 
@@ -59,6 +60,20 @@ class EvaluationEntry:
         eval_entries = cls.load_all(type, project_name)
         for entry in eval_entries:
             if entry.batch_id == batch_id:
+                return entry
+        else:
+            return None
+        
+    @classmethod
+    def get_eval_entry_by_eval_id(cls, eval_id, type, project_name):
+        """Check if an evaluation entry exists."""
+        path = cls.get_type_json_path(type, project_name)
+        if not os.path.exists(path):
+            return None
+        
+        eval_entries = cls.load_all(type, project_name)
+        for entry in eval_entries:
+            if entry.eval_id == eval_id:
                 return entry
         else:
             return None
@@ -315,9 +330,26 @@ class EvaluationEntry:
         df = pd.DataFrame(test_source_data, index=[0])
         return df
     
+
+    def redo_evaluation(self):
+        """Redo the evaluation"""
+        self.status = "redo_evaluation"
+        self.save()
+        
+        # Change the status to completed -> so that the evaluation can be redone
+        batch_requests = use_gpt.load_batch_requests(client=None)
+        for batch_request in batch_requests:
+            if batch_request.batch_id == self.batch_id:
+                batch_request.status = "completed"
+                print(f"Batch request status changed to completed: {self.batch_id}")
+                print(batch_request.status)
+        use_gpt.save_batch_requests(batch_requests)
+
+
     def __str__(self):
         return json.dumps(self.to_json())
 
-
-
-
+if __name__ == "__main__":
+    eval_id = "2/human_written/random_from_all/5"
+    eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
+    eval_entry.redo_evaluation()
