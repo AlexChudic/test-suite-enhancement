@@ -4,6 +4,8 @@ import subprocess
 import re
 import os
 import ast
+import shutil
+import math
 import compileall
 import importlib.util
 from pathlib import Path
@@ -400,70 +402,6 @@ def add_correction_evaluation_stats(stats, res):
             return False
 
 
-def get_class_under_test_coverage_metrics(test_case_path):
-    """Returns the class under test coverage."""
-
-    module_under_test_name = test_case_path.split("/")[-1].replace("test_", "").replace(".py", "")
-    tests_dir = "/".join(test_case_path.split("/")[:-1])
-
-    print(tests_dir)
-    print(module_under_test_name)
-    
-    # Verify paths exist
-    if not importlib.util.find_spec(module_under_test_name):
-        raise FileNotFoundError(f"Target file not found: {module_under_test_name}")
-    if not os.path.exists(tests_dir):
-        raise FileNotFoundError(f"Tests directory not found: {tests_dir}")
-    
-    # Build the command
-    cmd = [
-        "pytest",
-        f"--cov={module_under_test_name}",
-        "--cov-report=json",
-        "--timeout=5",
-        str(tests_dir)
-    ]
-    
-    try:
-        # Run the command and capture output
-        result = subprocess.run(
-            cmd,
-            check=True,
-            text=True,
-            capture_output=True
-        )
-        
-        # Get the coverage metrics from the json report
-        if not os.path.exists("coverage.json"):
-            raise FileNotFoundError("Coverage report not found: coverage.json")
-        
-        with open("coverage.json", "r") as f:
-            coverage_report = json.load(f)
-
-        file_metrics = coverage_report["files"][0]
-        coverage_metrics = {
-            "covered_lines": file_metrics["summary"]["covered_lines"],
-            "num_statements": file_metrics["summary"]["num_statements"],
-            "percent_covered": file_metrics["summary"]["percent_covered"],
-            "missing_lines": file_metrics["summary"]["missing_lines"],
-        }
-        return coverage_metrics
-    
-    except subprocess.CalledProcessError as e:
-        return f"Error running pytest:\n{e.stdout}\n{e.stderr}"
-    except Exception as e:
-        return f"Unexpected error: {str(e)}"
-
-
-def optimise_test_suite_effectiveness(test_case_path, enhanced_test_case_path, test_class, output):
-    """Optimises the test suite effectiveness by removing tests that do not improve coverage."""
-    # First, get the class under test coverage
-
-    # Next, add the enhance tests one at a time and check if the coverage improves
-
-    pass # TODO: implement this function!!
-
-
 def cleanup_no_unit_test_class(test_class_path):
     with open(test_class_path, "r", encoding="utf-8") as f:
         source_code = f.read()
@@ -507,8 +445,8 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
     }
 
     for test_class in test_classes:
-        if test_class not in ["test_HumanEval_116.py"]:
-            continue
+        # if test_class not in ["test_HumanEval_116.py"]:
+        #     continue
 
         # Evaluate the test class correctness
         test_class_path = os.path.join(path, test_class)
@@ -592,9 +530,197 @@ def print_file(path):
     with open(path, "r", encoding="utf-8") as f:
         test_class_source_code = f.read()
         print(test_class_source_code)
+    return test_class_source_code
+
+### Effectiveness Optimization
+
+def adjust_new_test_case(new_test_case, test_class_path):
+    """Adjusts the new test case to match the existing test case format."""
+    
+    with open(test_class_path, "r", encoding="utf-8") as f:
+        test_class = f.read()
+    
+    if "class " in test_class:
+        # Add the self argument to the test case
+        new_test_case = re.sub(r"def\s+(\w+)\s*\(", r"def \1(self, ", new_test_case)
+    else:
+        match = r'(def\s+\w+\s*\()([^)]*)\)(:)'
+
+        def replacer(match):
+            args = match.group(2).split(',')
+            args = [arg.strip() for arg in args if arg.strip() != 'self']
+            return match.group(1) + ', '.join(args) + ')' + match.group(3)
+        
+        # Remove the self argument from the test case
+        new_test_case = re.sub(match, replacer, new_test_case, count=1)
+
+    return new_test_case
+
+def get_class_under_test_coverage_metrics(test_case_path):
+    """Returns the class under test coverage."""
+
+    module_under_test_name = test_case_path.split("/")[-1].replace("test_", "").replace(".py", "")
+    tests_dir = "/".join(test_case_path.split("/")[:-1])
+    
+    if not importlib.util.find_spec(module_under_test_name):
+        raise FileNotFoundError(f"Target file not found: {module_under_test_name}")
+    if not os.path.exists(tests_dir):
+        raise FileNotFoundError(f"Tests directory not found: {tests_dir}")
+    
+    cmd = [
+        "pytest",
+        f"--cov={module_under_test_name}",
+        "--cov-branch",
+        "--cov-report=json",
+        "--timeout=5",
+        str(tests_dir)
+    ]
+    
+    try:
+        result = subprocess.run(
+            cmd,
+            check=True,
+            text=True,
+            capture_output=True
+        )
+        
+        # Get the coverage metrics from the json report
+        if not os.path.exists("coverage.json"):
+            raise FileNotFoundError("Coverage report not found: coverage.json")
+        
+        with open("coverage.json", "r") as f:
+            coverage_report = json.load(f)
+        
+        file_path = list(coverage_report["files"].keys())[0]
+        file_metrics = coverage_report["files"][file_path]
+        print("File metrics summary:")
+        print(json.dumps(file_metrics['summary'], indent=4))
+        coverage_metrics = {
+            "covered_lines": file_metrics["summary"]["covered_lines"],
+            "num_statements": file_metrics["summary"]["num_statements"],
+            "percent_covered": file_metrics["summary"]["percent_covered"],
+            "missing_lines": file_metrics["summary"]["missing_lines"],
+            "covered_branches": file_metrics["summary"]["covered_branches"],
+            "num_branches": file_metrics["summary"]["num_branches"],
+        }
+        if "num_branches" in file_metrics["summary"] and float(file_metrics["summary"]["num_branches"]) > 0:
+            coverage_metrics["percent_covered_branches"] = float(file_metrics["summary"]["covered_branches"]) / float(file_metrics["summary"]["num_branches"]) * 100
+        else:
+            coverage_metrics["percent_covered_branches"] = 100
+        
+        print("Coverage metrics:")
+        print(json.dumps(coverage_metrics, indent=4))
+        return coverage_metrics
+    
+    except subprocess.CalledProcessError as e:
+        return f"Error running pytest:\n{e.stdout}\n{e.stderr}"
+    except Exception as e:
+        return f"Unexpected error: {e}"
+
+
+def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_suite_path):
+    """Optimises the test suite effectiveness by removing tests that do not improve coverage."""
+    
+    test_classes = [ f for f in os.listdir(exising_test_suite_path) if f.endswith(".py")]
+    optimisation_statistics = {
+        "total_test_classes": len(test_classes),
+        "classes": {},
+    }
+    for test_class in test_classes:
+        # Get existing coverage metrics
+        test_class_path = os.path.join(exising_test_suite_path, test_class)
+        print("INFO: Evaluating correctness of the test class: ", test_class_path)
+        
+        existing_coverage = get_class_under_test_coverage_metrics(test_class_path)
+        print("Existing coverage: ", existing_coverage["percent_covered"])
+        print("Existing branch coverage: ", existing_coverage["percent_covered_branches"])
+
+        # Add the new tests one at a time to see if they improve coverage
+        new_test_cases_path = os.path.join(enhanced_test_suite_path, test_class)
+        new_test_cases = uf.extract_test_cases_from_file(new_test_cases_path)
+        class_stats = {
+            "total_test_cases": len(new_test_cases),
+            "kept_test_cases": 0,
+            "removed_test_cases": 0,
+            "skipped_test_cases": 0,
+            "faulty_test_cases": [],
+            "initial_coverage": existing_coverage,
+            "final_coverage": None,
+        }
+        for new_test_case in new_test_cases:
+            if math.isclose( float(existing_coverage["percent_covered"]), 100.0 ):
+                print("Skipping test case: ", new_test_case)
+                class_stats["skipped_test_cases"] += 1
+                continue
+
+            match = re.search(r'def\s+(\w+)\s*\(', new_test_case)
+            if match:
+                function_name = match.group(1)
+            else:
+                function_name = None
+
+            # Remove or add the self argument to the test case if needed
+            new_test_case = adjust_new_test_case(new_test_case, test_class_path)
+
+            print("Evaluating the new test case: ", function_name)
+            print(new_test_case)
+
+            # print("BEFORE:")
+            # print(print_file(test_class_path))
+
+            # Temporarily add the new test case to the existing test case
+            with open(test_class_path, "a", encoding="utf-8") as f:
+                f.write(new_test_case+"\n"+"\n")
+
+            # print("AFTER:")
+            # print(print_file(test_class_path))
+
+            new_coverage = get_class_under_test_coverage_metrics(test_class_path)
+
+            if "percent_covered" in new_coverage:
+                print("NEW coverage: ", new_coverage["percent_covered"])
+                print("NEW branch coverage: ", new_coverage["percent_covered_branches"])
+
+                # If the new test case improves coverage, keep it
+                if float(new_coverage["percent_covered"]) > float(existing_coverage["percent_covered"]) or float(new_coverage["percent_covered_branches"]) > float(existing_coverage["percent_covered_branches"]):
+                    print(f"Keeping test case: {new_test_case}")
+                    class_stats["kept_test_cases"] += 1
+                    existing_coverage = new_coverage
+                else:
+                    print(f"Removing test case: {new_test_case}")
+                    class_stats["removed_test_cases"] += 1
+                    # TODO: could remove the test case by the number of lines
+
+                    if function_name:
+                        # Remove the function definition from the test case
+                        print(f"Removing test case: {function_name}")               
+                        remove_functions(test_class_path, [function_name])
+                    else:
+                        print("ERROR: No function name found in the test case.")
+                
+                    # print("AFTER REMOVAL:")
+                    # print(print_file(test_class_path))
+            else:
+                print("No coverage metrics found in the report.")
+                class_stats["faulty_test_cases"].append(function_name)
+
+        class_stats["final_coverage"] = existing_coverage
+        optimisation_statistics["classes"][test_class] = class_stats
+
+        print(f"Class statistics: {test_class}")
+        print(json.dumps(class_stats, indent=4))
+
+        # Save the optimised test class
+        optimised_path = enhanced_test_suite_path.replace("enhanced", "optimised")
+        if not os.path.exists(optimised_path):
+            os.makedirs(optimised_path)
+        shutil.copy(test_class_path, os.path.join(optimised_path, test_class))
+
+    return optimisation_statistics
+
 
 if __name__ == "__main__":
     print("CORRECTNESS EVALUATION RESULTS:")
-    print(evaluate_functional_correctness("tmp/human_eval/tests/pynguin/") )
+    print(evaluate_functional_correctness("tmp/human_eval/tests/human_written/") )
 
     # get_class_under_test_coverage_metrics("tmp/human_eval/tests/chatgpt/test_HumanEval_107.py")

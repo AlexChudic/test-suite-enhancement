@@ -76,19 +76,31 @@ def run_initial_project_evaluations(project_name):
         )
         eval_entry.save()
 
-def rerun_enhanced_evaluation(project_name):
+def rerun_enhanced_evaluation(project_name, eval_id=None):
     eval_entries = EvaluationEntry.load_all("enhanced", project_name)
     for eval_entry in eval_entries:
-        if "enhanced_project_evaluation" in eval_entry.eval_data and "branch_coverage" in eval_entry.eval_data["enhanced_project_evaluation"]:
-            # Check if the branch coverage is less than 0.5
+        if eval_id:
+            if eval_entry.eval_id != eval_id:
+                continue
             branch_coverage = float(eval_entry.eval_data["enhanced_project_evaluation"]["branch_coverage"])
-            if branch_coverage < 0.5:
-                # if eval_entry.eval_id != "4/human_written/random_from_class_under_test/3":
-                #     continue
-                print(f"Rerunning enhanced evaluation for {eval_entry.eval_id}...")
-                print(f"Branch coverage = {branch_coverage}")
-                eval_entry.status = "corrected"
-                eval_entry.run_enhanced_evaluation()
+            
+            print(f"Rerunning enhanced evaluation for {eval_entry.eval_id}...")
+            print(f"Branch coverage = {branch_coverage}")
+            eval_entry.status = "corrected"
+            eval_entry.run_enhanced_evaluation()
+            eval_entry.run_test_suite_optimization()
+        else: # else rerun all without execution_duration
+            if "enhanced_project_evaluation" in eval_entry.eval_data and "branch_coverage" in eval_entry.eval_data["enhanced_project_evaluation"]:
+                branch_coverage = float(eval_entry.eval_data["enhanced_project_evaluation"]["branch_coverage"])
+                if branch_coverage < 0.5:
+                    # if eval_entry.eval_id != "4/human_written/random_from_class_under_test/3":
+                    #     continue
+                    print(f"Rerunning enhanced evaluation for {eval_entry.eval_id}...")
+                    print(f"Branch coverage = {branch_coverage}")
+                    eval_entry.status = "corrected"
+                    eval_entry.run_enhanced_evaluation()
+                    eval_entry.run_test_suite_optimization()
+
 
 def redo_evaluation(project_name, eval_id):
     eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
@@ -185,6 +197,7 @@ def run_full_pipeline(project_name, test_settings=None):
                         if eval_entry.status == "initial":
                             eval_entry.run_correctness_evaluation()
                             eval_entry.run_enhanced_evaluation()
+                            eval_entry.run_test_suite_optimization()
                         
                         # redo_evaluation is used when we want to re-evaluate the batch request
                         elif eval_entry.status == "redo_evaluation":
@@ -195,12 +208,16 @@ def run_full_pipeline(project_name, test_settings=None):
                             eval_entry.status = "initial"
                             eval_entry.run_correctness_evaluation()
                             eval_entry.run_enhanced_evaluation()
+                            eval_entry.run_test_suite_optimization()
                         
                         # corrected means that run_correctness_evaluation has been run, but we need to evaluate the enhanced test suite
                         elif eval_entry.status == "corrected":
                             eval_entry.run_enhanced_evaluation()
+                            eval_entry.run_test_suite_optimization()
                             
-                        else: # eval_entry.status == "evaluated":
+                        elif eval_entry.status == "evaluated":
+                            eval_entry.run_test_suite_optimization()
+                        else: # eval_entry.status == "optimised":
                             pass
                     else:
                         eval_data = {
@@ -220,7 +237,7 @@ if __name__ == "__main__":
     # ensure_initial_test_suite_correctness("human_eval", "pynguin")
     # run_initial_project_evaluations("human_eval")
 
-    # run_full_pipeline("human_eval")
+    run_full_pipeline("human_eval")
 
     # data_test_path = f"data/human_eval/tests/human_written/enhanced/human_written_random_from_all_5/"
     # tmp_test_path = f"tmp/human_eval/tests/human_written/"
@@ -229,8 +246,8 @@ if __name__ == "__main__":
     eval_ids = [
     "37/chatgpt/random_from_all/3",
     ]
-    for eval_id in eval_ids:
-        redo_evaluation('human_eval', eval_id)
-        # continue_evaluation(eval_id)
+    # for eval_id in eval_ids:
+    #     redo_evaluation('human_eval', eval_id)
+    #     # continue_evaluation(eval_id)
 
     # rerun_enhanced_evaluation("human_eval")

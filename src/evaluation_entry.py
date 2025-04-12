@@ -140,9 +140,9 @@ class EvaluationEntry:
                 project_name = self.get_project_name()
                 test_source = self.get_test_source()
                 
-                # WTF: Why is the test_source not in the path? 
-                # Actually, what is this copy even for?
-                uf.copy_python_files(f"data/{project_name}/tests/", f"tmp/{project_name}/tests/{test_source}")
+                # # WTF: Why is the test_source not in the path? 
+                # # Actually, what is this copy even for?
+                # uf.copy_python_files(f"data/{project_name}/tests/", f"tmp/{project_name}/tests/{test_source}")
                 
                 # First evaluate the full project to get code coverage
                 project_eval_metrics = eval.evaluate_project_directory(project_name)
@@ -165,6 +165,52 @@ class EvaluationEntry:
         else:
             print("Skipping enhanced evaluation - not in state=corrected")
             
+    def run_test_suite_optimization(self):
+        if self.status == "evaluated":
+            initial_test_suite_path = f"data/{ self.get_project_name() }/tests/{ self.get_test_source() }/"
+            enhanced_test_suite_path = f"data/{ self.get_project_name() }/tests/{ self.get_test_source() }/enhanced/{ uf.generate_identifier_string(self.identifiers) }/"
+            if os.path.exists(enhanced_test_suite_path):
+                tmp_test_path = f"tmp/{ self.get_project_name() }/tests/{ self.get_test_source() }/"
+                uf.copy_python_files(initial_test_suite_path, tmp_test_path)
+
+                # Run the test suite optimization
+                optimised_test_suite_stats = correctness_evaluation.optimise_test_suite_effectiveness(tmp_test_path, enhanced_test_suite_path)
+                print(optimised_test_suite_stats)
+
+                uf.delete_python_files(tmp_test_path)
+                uf.delete_repository(tmp_test_path)
+
+                # Save the optimised test suite stats
+                self.eval_data["optimised_test_suite_stats"] = optimised_test_suite_stats
+
+                # Perform optimised test suite evaluation
+                data_test_path = f"data/{ self.get_project_name() }/tests/{ self.get_test_source() }/optimised/{ uf.generate_identifier_string(self.identifiers) }/"
+                if os.path.exists(data_test_path):
+                    # Enhanced test suite has been generated from the batch request - continue with evaluation
+                    tmp_test_path = f"tmp/{ self.get_project_name() }/tests/{ self.get_test_source() }/"
+                    uf.copy_python_files(data_test_path, tmp_test_path)
+
+                    # First evaluate the full project to get code coverage
+                    optimised_project_eval_metrics = eval.evaluate_project_directory(self.get_project_name())
+                    self.eval_data["optimised_project_evaluation"] = optimised_project_eval_metrics
+                    print(optimised_project_eval_metrics)
+
+                    # Then evaluate the test directory to get code quality metrics
+                    optimised_test_eval_metrics = eval.evaluate_project_directory(self.get_project_name())
+                    self.eval_data["optimised_test_evaluation"] = optimised_test_eval_metrics
+                    print(optimised_test_eval_metrics)
+
+                    uf.delete_python_files(tmp_test_path)
+                    uf.delete_repository(tmp_test_path)
+                else:
+                    print(f"Skipping optimised evaluation - test suite path does not exist: {data_test_path}")
+
+                self.status = "optimized"
+                self.save()
+            else:
+                print(f"Skipping test suite optimization - enhanced test suite path does not exist: {enhanced_test_suite_path}")
+        else:
+            print(f"Skipping test suite optimization {self.eval_id} - not in state=evaluated")
 
     def generate_eval_id(self):
         """Generate a unique evaluation ID."""
@@ -355,6 +401,6 @@ class EvaluationEntry:
         return json.dumps(self.to_json())
 
 if __name__ == "__main__":
-    eval_id = "2/human_written/random_from_all/5"
+    eval_id = "1/human_written/random_from_all/3"
     eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
-    eval_entry.redo_evaluation()
+    eval_entry.run_test_suite_optimization()
