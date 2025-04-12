@@ -76,6 +76,19 @@ def run_initial_project_evaluations(project_name):
         )
         eval_entry.save()
 
+def rerun_enhanced_evaluation(project_name):
+    eval_entries = EvaluationEntry.load_all("enhanced", project_name)
+    for eval_entry in eval_entries:
+        if "enhanced_project_evaluation" in eval_entry.eval_data and "branch_coverage" in eval_entry.eval_data["enhanced_project_evaluation"]:
+            # Check if the branch coverage is less than 0.5
+            branch_coverage = float(eval_entry.eval_data["enhanced_project_evaluation"]["branch_coverage"])
+            if branch_coverage < 0.5:
+                # if eval_entry.eval_id != "4/human_written/random_from_class_under_test/3":
+                #     continue
+                print(f"Rerunning enhanced evaluation for {eval_entry.eval_id}...")
+                print(f"Branch coverage = {branch_coverage}")
+                eval_entry.status = "corrected"
+                eval_entry.run_enhanced_evaluation()
 
 def redo_evaluation(project_name, eval_id):
     eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
@@ -87,7 +100,7 @@ def redo_evaluation(project_name, eval_id):
         "example_selection_mode": eval_entry.identifiers["test_selection_mode"],
         "num_test_cases": eval_entry.identifiers["num_test_cases"]
     }
-    # run_full_pipeline(project_name, test_settings=settings)
+    run_full_pipeline(project_name, test_settings=settings)
 
 def continue_evaluation(eval_id):
     eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
@@ -207,36 +220,17 @@ if __name__ == "__main__":
     # ensure_initial_test_suite_correctness("human_eval", "pynguin")
     # run_initial_project_evaluations("human_eval")
 
-    run_full_pipeline("human_eval")
+    # run_full_pipeline("human_eval")
 
     # data_test_path = f"data/human_eval/tests/human_written/enhanced/human_written_random_from_all_5/"
     # tmp_test_path = f"tmp/human_eval/tests/human_written/"
     # uf.copy_python_files(data_test_path, tmp_test_path)
 
     eval_ids = [
-        # "9/human_written/class_similarity_no_definition/1",
-        # "4/human_written/random_from_class_under_test/3",
-        # "5/human_written/random_from_class_under_test/5",
-        # "18/pynguin/random_from_all/1",
-        # "20/pynguin/random_from_all/5",
-        # "21/pynguin/random_from_class_under_test/1",
-        # "22/pynguin/random_from_class_under_test/3",
-        # "23/pynguin/random_from_class_under_test/5",
-        # "24/pynguin/problem_similarity/1",
-        # "25/pynguin/problem_similarity/3",
-        # "26/pynguin/problem_similarity/5",
-        # "27/pynguin/class_similarity_no_definition/1",
-        # "28/pynguin/class_similarity_no_definition/3",
-        # "29/pynguin/class_similarity_no_definition/5",
-        # "30/pynguin/class_similarity_with_definition/1",
-        # "31/pynguin/class_similarity_with_definition/3",
-        # "32/pynguin/class_similarity_with_definition/5",
-        # "33/pynguin/problem_and_class_similarity/1",
-        # "34/pynguin/problem_and_class_similarity/3",
-        # "35/pynguin/problem_and_class_similarity/5",
-        # "36/chatgpt/random_from_all/1",
-        # "38/chatgpt/random_from_all/5",
+    "37/chatgpt/random_from_all/3",
     ]
-    # for eval_id in eval_ids:
-    #     redo_evaluation('human_eval', eval_id)
-    #     continue_evaluation(eval_id)
+    for eval_id in eval_ids:
+        redo_evaluation('human_eval', eval_id)
+        # continue_evaluation(eval_id)
+
+    # rerun_enhanced_evaluation("human_eval")
