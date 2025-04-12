@@ -33,7 +33,7 @@ fi
 # Run tox
 echo "Running tox -e py39 in $project_name"
 export COV_MODULE=$project_name
-tox -e py39
+tox -e py39 | tee "tox_output.log"
 
 # Check if coverage.xml has been generated
 if [ -f "coverage.xml" ]; then

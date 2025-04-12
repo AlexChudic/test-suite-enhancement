@@ -1,6 +1,7 @@
 import requests
 import time
 import json
+import re
 import subprocess
 import os
 import base64
@@ -142,7 +143,11 @@ def format_sonarqube_results(results):
                 metrics[measure["metric"]] = measure["value"]
             elif "period" in measure:
                 metrics[measure["metric"]] = measure["period"]["value"]
-        
+
+        # Add the execution duration
+        execution_duration = get_execution_duration()
+        metrics["execution_duration"] = execution_duration
+
         return metrics
     except Exception as e:
         print("Error formatting SonarQube results:", e)
@@ -186,9 +191,23 @@ def evaluate_test_suite(project_name):
         print("Error Output:\n", e.stderr)
 
         
-def evaluate_test_correctness():
-    """Evaluates the correctness of the test suite."""
-    pass
+def get_execution_duration():
+    """Retrieves the execution duration from tox_output.log file"""
+    with open("tmp/tox_output.log", "r") as file:
+        lines = file.readlines()
+        line = lines[-1]
+
+    # Extract the execution duration from the line
+    time = re.search(r"\((\d+\.\d+) seconds\)", line)
+    if time:
+        execution_duration = time.group(1)
+        print("Execution duration:", execution_duration)
+        execution_duration = float(execution_duration)
+    else:
+        print("Execution duration not found in the log file.")
+        execution_duration = None
+    
+    return execution_duration
 
 
 if __name__ == "__main__":

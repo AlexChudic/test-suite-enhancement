@@ -302,6 +302,7 @@ class EvaluationEntry:
             "line_coverage" : eval_data_project["line_coverage"],
             "lines_to_cover" : eval_data_project["lines_to_cover"],
             "uncovered_lines" : eval_data_project["uncovered_lines"],
+            "execution_time" : eval_data_project["execution_time"],
 
             # Test quality stats
             "lines" : eval_data_test["lines"],
