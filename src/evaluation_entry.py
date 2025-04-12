@@ -291,6 +291,10 @@ class EvaluationEntry:
             "rule_7_repaired_tests": correctnes_data["repair_stats"]["rule_0"],
             "rule_8_repair_count": len(correctnes_data["repair_stats"]["rule_1"]),
             "rule_8_repaired_tests": correctnes_data["repair_stats"]["rule_1"],
+            "rule_9_repair_count": len(correctnes_data["repair_stats"]["rule_6"]),
+            "rule_9_repaired_tests": correctnes_data["repair_stats"]["rule_6"],
+            "rule_10_repair_count": len(correctnes_data["repair_stats"]["rule_7"]),
+            "rule_10_repaired_tests": correctnes_data["repair_stats"]["rule_7"],
 
             # Coverage stats
             "coverage" : eval_data_project["coverage"],
