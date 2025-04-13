@@ -401,6 +401,6 @@ class EvaluationEntry:
         return json.dumps(self.to_json())
 
 if __name__ == "__main__":
-    eval_id = "1/human_written/random_from_all/3"
+    eval_id = "36/chatgpt/random_from_all/1"
     eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
     eval_entry.run_test_suite_optimization()

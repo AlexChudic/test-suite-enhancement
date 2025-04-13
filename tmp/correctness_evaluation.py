@@ -331,11 +331,22 @@ def remove_failing_tests(test_case_path, res, test_class, output):
     print(failing_tests)
     remove_functions(test_case_path, failing_tests)
     
-    
-def remove_functions(test_case_path, functions_to_remove):
+def get_function_definition_count(source_code, function_name):
+    """Counts the number of times a function is defined in the source code."""
+    pattern = rf"^\s*def\s+{function_name}\s*\("
+    return len(re.findall(pattern, source_code, re.MULTILINE))
+
+def remove_functions(test_case_path, functions_to_remove, removeLast=False):
     with open(test_case_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
+    functions_count = {}
+    functions_occurance = { function_name:0 for function_name in functions_to_remove }
+    if removeLast: 
+        for function_name in functions_to_remove:
+            function_count = get_function_definition_count("".join(lines), function_name)
+            functions_count[function_name] = function_count
+              
     new_lines = []
     skip = False
     leading_spaces = 0
@@ -346,6 +357,17 @@ def remove_functions(test_case_path, functions_to_remove):
 
         # Check if the line starts a failed function
         if any(f"def {fn}(" in stripped for fn in functions_to_remove):
+            fn = re.search(r"def\s+(\w+)\s*\(", stripped).group(1)
+            functions_occurance[fn] += 1
+
+            # if removeLast -> only remove the last occurance of the function
+            if removeLast and functions_occurance[fn] < functions_count[fn]:
+                if lines[i-1].strip().startswith(("@", "#")):
+                    new_lines.append(lines[i-1])
+                skip = False
+                new_lines.append(lines[i])
+                continue
+                
             skip = True
             leading_spaces = lines[i].index(stripped)
 
@@ -510,7 +532,7 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
 
 
 def remove_test_function_implementation(path, test_class, output):
-    """Removes the test function implementation from the test class."""
+    """Removes the class under test function implementation from the test class."""
     test_class_path = os.path.join(path, test_class)
     with open(test_class_path, "r", encoding="utf-8") as f:
         test_class_source_code = f.read()
@@ -539,10 +561,17 @@ def adjust_new_test_case(new_test_case, test_class_path):
     
     with open(test_class_path, "r", encoding="utf-8") as f:
         test_class = f.read()
-    
+
     if "class " in test_class:
-        # Add the self argument to the test case
-        new_test_case = re.sub(r"def\s+(\w+)\s*\(", r"def \1(self, ", new_test_case)
+        if not re.search(r'def\s+\w+\s*\(\s*self\b', new_test_case):
+            # Add the self argument to the test case
+            new_test_case = re.sub(r"def\s+(\w+)\s*\(", r"def \1(self, ", new_test_case)
+
+        new_lines = []
+        lines = new_test_case.split("\n")
+        for line in lines:
+            new_lines.append(f"    {line}")
+        new_test_case = "\n".join(new_lines)
     else:
         match = r'(def\s+\w+\s*\()([^)]*)\)(:)'
 
@@ -627,6 +656,8 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
         "classes": {},
     }
     for test_class in test_classes:
+        # if test_class not in ["test_HumanEval_50.py"]:
+        #     continue
         # Get existing coverage metrics
         test_class_path = os.path.join(exising_test_suite_path, test_class)
         print("INFO: Evaluating correctness of the test class: ", test_class_path)
@@ -648,7 +679,7 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
             "final_coverage": None,
         }
         for new_test_case in new_test_cases:
-            if math.isclose( float(existing_coverage["percent_covered"]), 100.0 ):
+            if math.isclose( float(existing_coverage["percent_covered"]), 100.0 ) and math.isclose( float(existing_coverage["percent_covered_branches"]), 100.0 ):
                 print("Skipping test case: ", new_test_case)
                 class_stats["skipped_test_cases"] += 1
                 continue
@@ -670,7 +701,7 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
 
             # Temporarily add the new test case to the existing test case
             with open(test_class_path, "a", encoding="utf-8") as f:
-                f.write(new_test_case+"\n"+"\n")
+                f.write("\n"+new_test_case+"\n")
 
             # print("AFTER:")
             # print(print_file(test_class_path))
@@ -694,15 +725,22 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
                     if function_name:
                         # Remove the function definition from the test case
                         print(f"Removing test case: {function_name}")               
-                        remove_functions(test_class_path, [function_name])
+                        remove_functions(test_class_path, [function_name], True)
                     else:
                         print("ERROR: No function name found in the test case.")
                 
                     # print("AFTER REMOVAL:")
-                    # print(print_file(test_class_path))
+                    # print(print_file(test_clsass_path))
             else:
-                print("No coverage metrics found in the report.")
+                print("ERROR: No coverage metrics found in the report.")
+                print(new_coverage)
                 class_stats["faulty_test_cases"].append(function_name)
+                if function_name:
+                    # Remove the function definition from the test case
+                    print(f"Removing test case: {function_name}")               
+                    remove_functions(test_class_path, [function_name], True)
+                else:
+                    print("ERROR: No function name found in the test case.")
 
         class_stats["final_coverage"] = existing_coverage
         optimisation_statistics["classes"][test_class] = class_stats
