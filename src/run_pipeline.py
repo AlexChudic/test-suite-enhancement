@@ -89,6 +89,7 @@ def rerun_enhanced_evaluation(project_name, eval_id=None):
             eval_entry.status = "corrected"
             eval_entry.run_enhanced_evaluation()
             eval_entry.run_test_suite_optimization()
+            eval_entry.run_optimised_evaluation()
         else: # else rerun all without execution_duration
             if "enhanced_project_evaluation" in eval_entry.eval_data and "branch_coverage" in eval_entry.eval_data["enhanced_project_evaluation"]:
                 branch_coverage = float(eval_entry.eval_data["enhanced_project_evaluation"]["branch_coverage"])
@@ -100,6 +101,7 @@ def rerun_enhanced_evaluation(project_name, eval_id=None):
                     eval_entry.status = "corrected"
                     eval_entry.run_enhanced_evaluation()
                     eval_entry.run_test_suite_optimization()
+                    eval_entry.run_optimised_evaluation()
 
 
 def redo_evaluation(project_name, eval_id):
@@ -198,6 +200,7 @@ def run_full_pipeline(project_name, test_settings=None):
                             eval_entry.run_correctness_evaluation()
                             eval_entry.run_enhanced_evaluation()
                             eval_entry.run_test_suite_optimization()
+                            eval_entry.run_optimised_evaluation()
                         
                         # redo_evaluation is used when we want to re-evaluate the batch request
                         elif eval_entry.status == "redo_evaluation":
@@ -209,15 +212,20 @@ def run_full_pipeline(project_name, test_settings=None):
                             eval_entry.run_correctness_evaluation()
                             eval_entry.run_enhanced_evaluation()
                             eval_entry.run_test_suite_optimization()
+                            eval_entry.run_optimised_evaluation()
                         
                         # corrected means that run_correctness_evaluation has been run, but we need to evaluate the enhanced test suite
                         elif eval_entry.status == "corrected":
                             eval_entry.run_enhanced_evaluation()
                             eval_entry.run_test_suite_optimization()
+                            eval_entry.run_optimised_evaluation()
                             
                         elif eval_entry.status == "evaluated":
                             eval_entry.run_test_suite_optimization()
-                        else: # eval_entry.status == "optimised":
+                            eval_entry.run_optimised_evaluation()
+                        elif eval_entry.status == "optimised":
+                            eval_entry.run_optimised_evaluation()
+                        else: # eval_entry.status == "finalised":  
                             pass
                     else:
                         eval_data = {

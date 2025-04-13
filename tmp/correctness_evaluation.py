@@ -696,15 +696,9 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
             print("Evaluating the new test case: ", function_name)
             print(new_test_case)
 
-            # print("BEFORE:")
-            # print(print_file(test_class_path))
-
             # Temporarily add the new test case to the existing test case
             with open(test_class_path, "a", encoding="utf-8") as f:
                 f.write("\n"+new_test_case+"\n")
-
-            # print("AFTER:")
-            # print(print_file(test_class_path))
 
             new_coverage = get_class_under_test_coverage_metrics(test_class_path)
 
@@ -728,9 +722,7 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
                         remove_functions(test_class_path, [function_name], True)
                     else:
                         print("ERROR: No function name found in the test case.")
-                
-                    # print("AFTER REMOVAL:")
-                    # print(print_file(test_clsass_path))
+                        
             else:
                 print("ERROR: No coverage metrics found in the report.")
                 print(new_coverage)
@@ -758,7 +750,8 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
 
 
 if __name__ == "__main__":
-    print("CORRECTNESS EVALUATION RESULTS:")
-    print(evaluate_functional_correctness("tmp/human_eval/tests/human_written/") )
+    # print("CORRECTNESS EVALUATION RESULTS:")
+    # print(evaluate_functional_correctness("tmp/human_eval/tests/human_written/") )
 
     # get_class_under_test_coverage_metrics("tmp/human_eval/tests/chatgpt/test_HumanEval_107.py")
+    uf.copy_python_files("data/human_eval/tests/chatgpt/optimised/chatgpt_random_from_all_1", "tmp/human_eval/tests/chatgpt")
