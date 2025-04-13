@@ -180,6 +180,7 @@ def evaluate_test_suite(project_name):
         # Run the command and capture the output
         print("Running the evaluate-test-suite.sh script...")
         result = subprocess.run(command, check=True, text=True, capture_output=True)
+        # print(result.stdout)
 
         # Print the output of the command
         print("Test suite evaluation script executed successfully!")

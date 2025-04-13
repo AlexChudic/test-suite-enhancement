@@ -11,6 +11,14 @@ if [ "$#" -ne 1 ]; then
 fi
 
 project_name=$1
+project_list=("human_eval" "classeval")
+
+for project in "${project_list[@]}"; do
+    if [[ "$project_name" != "$project" ]]; then
+        non_matching_project="$project"
+        break
+    fi
+done
 
 # Check if the tmp directory exists
 if [ ! -d "$TMP_DIR" ]; then
@@ -33,6 +41,7 @@ fi
 # Run tox
 echo "Running tox -e py39 in $project_name"
 export COV_MODULE=$project_name
+export NOT_COV_MODULE=$non_matching_project
 tox -e py39 | tee "tox_output.log"
 
 # Check if coverage.xml has been generated
