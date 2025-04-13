@@ -5,7 +5,9 @@ tmp/*
 !tmp/correctness_evaluation.py
 .env
 /human-eval
+/ClassEval
 */__pycache__
 .scannerwork
 report.json
 coverage.json
+.coverage
