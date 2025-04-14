@@ -350,10 +350,10 @@ class EvaluationEntry:
             "rule_7_repaired_tests": correctnes_data["repair_stats"]["rule_0"],
             "rule_8_repair_count": len(correctnes_data["repair_stats"]["rule_1"]),
             "rule_8_repaired_tests": correctnes_data["repair_stats"]["rule_1"],
-            "rule_9_repair_count": len(correctnes_data["repair_stats"]["rule_6"]),
-            "rule_9_repaired_tests": correctnes_data["repair_stats"]["rule_6"],
-            "rule_10_repair_count": len(correctnes_data["repair_stats"]["rule_7"]),
-            "rule_10_repaired_tests": correctnes_data["repair_stats"]["rule_7"],
+            "rule_9_repair_count": len(correctnes_data["repair_stats"]["rule_6"]) if "rule_6" in correctnes_data["repair_stats"] and correctnes_data["repair_stats"]["rule_6"] else 0,
+            "rule_9_repaired_tests": correctnes_data["repair_stats"]["rule_6"] if "rule_6" in correctnes_data["repair_stats"] and correctnes_data["repair_stats"]["rule_6"] else [],
+            "rule_10_repair_count": len(correctnes_data["repair_stats"]["rule_7"]) if "rule_7" in correctnes_data["repair_stats"] and correctnes_data["repair_stats"]["rule_7"] else 0,
+            "rule_10_repaired_tests": correctnes_data["repair_stats"]["rule_7"] if "rule_7" in correctnes_data["repair_stats"] and correctnes_data["repair_stats"]["rule_7"] else [],
 
             # Coverage stats
             "coverage" : eval_data_project["coverage"],
@@ -373,9 +373,6 @@ class EvaluationEntry:
             "code_smells" : eval_data_test["code_smells"],
             "bugs" : eval_data_test["bugs"],
             "vulnerabilities" : eval_data_test["vulnerabilities"],
-
-            # Optimisation stats
-            # TODO: Add optimised test suite stats
         }
 
         # Calculate additional metrics
@@ -397,6 +394,59 @@ class EvaluationEntry:
         df = pd.DataFrame(test_source_data, index=[0])
         return df
     
+    def get_optimised_eval_entry_csv(self):
+        optimised_data = {
+            "eval_id" : self.eval_id,
+            "test_source": self.identifiers["test_source"],
+            "num_test_cases" : self.identifiers["num_test_cases"] if "num_test_cases" in self.identifiers else None,
+            "test_selection_mode" : self.identifiers["test_selection_mode"] if "test_selection_mode" in self.identifiers else None,
+            "total_classes" : 0,
+            "total_tests" : 0,
+        }
+
+        if self.status in ['finalised', 'optimized']:
+            # Extract the optimised test suite stats
+            optimised_stats = self.eval_data["optimised_test_suite_stats"]
+            if optimised_stats:
+                # Get test totals
+                optimised_data["total_classes"] = optimised_stats["total_test_classes"]
+                total_tests = sum([ stats["total_test_cases"] for stats in optimised_stats["classes"].values() ])
+                total_kept_tests = sum([ stats["kept_test_cases"] for stats in optimised_stats["classes"].values() ])
+                total_removed_tests = sum([ stats["removed_test_cases"] for stats in optimised_stats["classes"].values() ])
+                total_skipped_tests = sum([ stats["skipped_test_cases"] for stats in optimised_stats["classes"].values() ])
+                total_faulty_tests = sum([ len(stats["faulty_test_cases"]) for stats in optimised_stats["classes"].values() ])
+                optimised_data["total_tests"] = total_tests
+                optimised_data["total_kept_tests"] = total_kept_tests
+                optimised_data["total_removed_tests"] = total_removed_tests
+                optimised_data["total_skipped_tests"] = total_skipped_tests
+                optimised_data["total_faulty_tests"] = total_faulty_tests
+                
+        if self.status in ['finalised']:
+            # Extract the optimised project evaluation
+            optimised_project_eval = self.eval_data["optimised_project_evaluation"]
+            if optimised_project_eval:
+                optimised_data["coverage"] = optimised_project_eval["coverage"]
+                optimised_data["branch_coverage"] = optimised_project_eval["branch_coverage"]
+                optimised_data["line_coverage"] = optimised_project_eval["line_coverage"]
+                optimised_data["lines_to_cover"] = optimised_project_eval["lines_to_cover"]
+                optimised_data["uncovered_lines"] = optimised_project_eval["uncovered_lines"]
+                optimised_data["execution_time"] = optimised_project_eval["execution_duration"]
+
+            optimised_test_eval = self.eval_data["optimised_test_evaluation"]
+            if optimised_test_eval:
+                optimised_data["lines"] = optimised_test_eval["lines"]
+                optimised_data["non_comment_lines"] = optimised_test_eval["ncloc"]
+                optimised_data["comment_lines"] = optimised_test_eval["comment_lines"]
+                optimised_data["cognitive_complexity"] = optimised_test_eval["cognitive_complexity"]
+                optimised_data["cyclomatic_complexity"] = optimised_test_eval["complexity"]
+                optimised_data["squale_index"] = optimised_test_eval["sqale_index"]
+                optimised_data["code_smells"] = optimised_test_eval["code_smells"]
+                optimised_data["bugs"] = optimised_test_eval["bugs"]
+                optimised_data["vulnerabilities"] = optimised_test_eval["vulnerabilities"]
+        
+        df = pd.DataFrame(optimised_data, index=[0])
+        return df
+                
 
     def redo_evaluation(self):
         """Redo the evaluation"""
@@ -417,7 +467,8 @@ class EvaluationEntry:
         return json.dumps(self.to_json())
 
 if __name__ == "__main__":
-    eval_id = "36/chatgpt/random_from_all/1"
+    eval_id = "18/pynguin/random_from_all/1"
     eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
-    eval_entry.status = "optimized"
-    eval_entry.run_optimised_evaluation()
+    eval_entry.status = "evaluated"
+    eval_entry.run_test_suite_optimization()
+    # eval_entry.run_optimised_evaluation()
