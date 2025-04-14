@@ -74,7 +74,6 @@ def run_initial_project_evaluations(project_name):
             eval_data=eval_metrics,
             status="evaluated"
         )
-        eval_entry.save()
 
 def rerun_enhanced_evaluation(project_name, eval_id=None):
     eval_entries = EvaluationEntry.load_all("enhanced", project_name)

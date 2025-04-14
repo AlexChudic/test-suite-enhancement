@@ -81,10 +81,17 @@ def get_python_file_content(file_path):
 
 def extract_test_cases_from_file(file_path):
     """Returns the test cases for the specified class."""
-    with open(file_path, "r", encoding="utf-8") as f:
-        source_code = f.read()
-        tree = ast.parse(source_code, filename=file_path)
-
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            source_code = f.read()
+            tree = ast.parse(source_code, filename=file_path)
+    except SyntaxError as e:
+        print(f"Syntax error in file {file_path}: {e}")
+        return []
+    except Exception as e:
+        print(f"Error reading file {file_path}: {e}")
+        return []
+    
     test_cases = []
     lines = source_code.splitlines()
 
@@ -93,8 +100,15 @@ def extract_test_cases_from_file(file_path):
         start_lineno = node.lineno - 1
         end_lineno = node.end_lineno
 
-        # Include decorator lines if present
-        while start_lineno > 0 and lines[start_lineno-1].strip().startswith("@"):
+        # Include multi-line decorator if present
+        if start_lineno > 0 and lines[start_lineno-1].strip().startswith("])"):
+            new_start_lineno = start_lineno - 1
+            while new_start_lineno > 0 and not lines[new_start_lineno].strip().startswith("@"):
+                new_start_lineno -= 1
+            start_lineno = new_start_lineno
+
+        # Include decorator if present
+        if start_lineno < 0 and lines[start_lineno-1].strip().startswith("@"):
             start_lineno -= 1
 
         return "\n".join(lines[start_lineno:end_lineno])

@@ -303,6 +303,7 @@ def get_failing_tests(report_path):
 
     return failed_tests
 
+
 def get_error_tests(report_path):
     """Extracts the names of the error tests from a pytest report."""
     
@@ -331,10 +332,12 @@ def remove_failing_tests(test_case_path, res, test_class, output):
     print(failing_tests)
     remove_functions(test_case_path, failing_tests)
     
+
 def get_function_definition_count(source_code, function_name):
     """Counts the number of times a function is defined in the source code."""
     pattern = rf"^\s*def\s+{function_name}\s*\("
     return len(re.findall(pattern, source_code, re.MULTILINE))
+
 
 def remove_functions(test_case_path, functions_to_remove, removeLast=False):
     with open(test_case_path, "r", encoding="utf-8") as f:
@@ -556,15 +559,26 @@ def print_file(path):
 
 ### Effectiveness Optimization
 
+def remove_new_test_case(new_test_case, test_class_path):
+    with open(test_class_path, "r", encoding="utf-8") as f:
+        test_class_source_code = f.read()
+
+    # Remove the new test case from the test class source code
+    test_class_source_code = test_class_source_code.replace(f"\n"+new_test_case+"\n", "", 1)
+    
+    with open(test_class_path, "w", encoding="utf-8") as f:
+        f.write(test_class_source_code)
+
 def adjust_new_test_case(new_test_case, test_class_path):
     """Adjusts the new test case to match the existing test case format."""
     
     with open(test_class_path, "r", encoding="utf-8") as f:
         test_class = f.read()
 
+    # Handle class-based test cases
     if "class " in test_class:
+        # If unit tests are in a class, add the self argument if not present
         if not re.search(r'def\s+\w+\s*\(\s*self\b', new_test_case):
-            # Add the self argument to the test case
             new_test_case = re.sub(r"def\s+(\w+)\s*\(", r"def \1(self, ", new_test_case)
 
         new_lines = []
@@ -573,6 +587,7 @@ def adjust_new_test_case(new_test_case, test_class_path):
             new_lines.append(f"    {line}")
         new_test_case = "\n".join(new_lines)
     else:
+        # If unit tests are standalone, remove the self argument if present
         match = r'(def\s+\w+\s*\()([^)]*)\)(:)'
 
         def replacer(match):
@@ -580,8 +595,21 @@ def adjust_new_test_case(new_test_case, test_class_path):
             args = [arg.strip() for arg in args if arg.strip() != 'self']
             return match.group(1) + ', '.join(args) + ')' + match.group(3)
         
-        # Remove the self argument from the test case
         new_test_case = re.sub(match, replacer, new_test_case, count=1)
+
+    # Handle pynguin imports (module_0)
+    module_name = os.path.basename(test_class_path).replace(".py", "").removeprefix("test_")
+    pynguin_import = f"import {module_name} as module_0"
+    if pynguin_import in test_class:
+        # Add the module_0. prefix to everywhere the function from module_0 is used
+        print("Adding module_0 prefix to function names if needed")
+        function_names = extract_function_name(test_class_path, module_name)
+        pattern = r'(?<!module_0\.)\b(' + '|'.join(map(re.escape, function_names)) + r')\b'
+
+        def add_module_prefix(match):
+            return f'module_0.{match.group(1)}'
+        
+        new_test_case = re.sub(pattern, add_module_prefix, new_test_case)
 
     return new_test_case
 
@@ -656,13 +684,22 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
         "classes": {},
     }
     for test_class in test_classes:
-        # if test_class not in ["test_HumanEval_50.py"]:
+        # if test_class not in ["test_HumanEval_108.py", "test_HumanEval_112.py"]:
         #     continue
         # Get existing coverage metrics
         test_class_path = os.path.join(exising_test_suite_path, test_class)
-        print("INFO: Evaluating correctness of the test class: ", test_class_path)
+        print("INFO: Optimising the test class: ", test_class_path)
         
         existing_coverage = get_class_under_test_coverage_metrics(test_class_path)
+        if "percent_covered" not in existing_coverage:
+            print("ERROR: No coverage metrics found in the report.")
+            print(existing_coverage)
+
+            existing_coverage = {
+                "percent_covered": 0,
+                "percent_covered_branches": 0,
+            }
+             
         print("Existing coverage: ", existing_coverage["percent_covered"])
         print("Existing branch coverage: ", existing_coverage["percent_covered_branches"])
 
@@ -674,7 +711,7 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
             "kept_test_cases": 0,
             "removed_test_cases": 0,
             "skipped_test_cases": 0,
-            "faulty_test_cases": [],
+            "faulty_test_cases": 0,
             "initial_coverage": existing_coverage,
             "final_coverage": None,
         }
@@ -684,16 +721,10 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
                 class_stats["skipped_test_cases"] += 1
                 continue
 
-            match = re.search(r'def\s+(\w+)\s*\(', new_test_case)
-            if match:
-                function_name = match.group(1)
-            else:
-                function_name = None
-
             # Remove or add the self argument to the test case if needed
             new_test_case = adjust_new_test_case(new_test_case, test_class_path)
 
-            print("Evaluating the new test case: ", function_name)
+            print("Evaluating the new test case: ")
             print(new_test_case)
 
             # Temporarily add the new test case to the existing test case
@@ -706,33 +737,26 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
                 print("NEW coverage: ", new_coverage["percent_covered"])
                 print("NEW branch coverage: ", new_coverage["percent_covered_branches"])
 
-                # If the new test case improves coverage, keep it
                 if float(new_coverage["percent_covered"]) > float(existing_coverage["percent_covered"]) or float(new_coverage["percent_covered_branches"]) > float(existing_coverage["percent_covered_branches"]):
-                    print(f"Keeping test case: {new_test_case}")
+                    # If the new test case improves coverage, keep it
+                    print(f"Keeping test case:\n {new_test_case}")
                     class_stats["kept_test_cases"] += 1
                     existing_coverage = new_coverage
                 else:
-                    print(f"Removing test case: {new_test_case}")
+                    # If the new test case does not improve coverage, remove it
+                    print(f"Removing test case:\n {new_test_case}")
                     class_stats["removed_test_cases"] += 1
-                    # TODO: could remove the test case by the number of lines
+                    remove_new_test_case(new_test_case, test_class_path)
 
-                    if function_name:
-                        # Remove the function definition from the test case
-                        print(f"Removing test case: {function_name}")               
-                        remove_functions(test_class_path, [function_name], True)
-                    else:
-                        print("ERROR: No function name found in the test case.")
-                        
             else:
                 print("ERROR: No coverage metrics found in the report.")
                 print(new_coverage)
-                class_stats["faulty_test_cases"].append(function_name)
-                if function_name:
-                    # Remove the function definition from the test case
-                    print(f"Removing test case: {function_name}")               
-                    remove_functions(test_class_path, [function_name], True)
-                else:
-                    print("ERROR: No function name found in the test case.")
+                class_stats["faulty_test_cases"] += 1
+                
+                # Remove the function definition from the test class
+                print(f"Removing test case: ") 
+                print(new_test_case)              
+                remove_new_test_case(new_test_case, test_class_path)
 
         class_stats["final_coverage"] = existing_coverage
         optimisation_statistics["classes"][test_class] = class_stats
@@ -754,4 +778,5 @@ if __name__ == "__main__":
     # print(evaluate_functional_correctness("tmp/human_eval/tests/human_written/") )
 
     # get_class_under_test_coverage_metrics("tmp/human_eval/tests/chatgpt/test_HumanEval_107.py")
-    uf.copy_python_files("data/human_eval/tests/chatgpt/optimised/chatgpt_random_from_all_1", "tmp/human_eval/tests/chatgpt")
+    # uf.copy_python_files("data/human_eval/tests/chatgpt/optimised/chatgpt_random_from_all_1", "tmp/human_eval/tests/chatgpt")
+    pass
