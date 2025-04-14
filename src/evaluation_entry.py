@@ -167,7 +167,7 @@ class EvaluationEntry:
             
 
     def run_test_suite_optimization(self):
-        if self.status == "evaluated":
+        if self.status == "evaluated" and self.type != "initial":
             
             initial_test_suite_path = f"data/{ self.get_project_name() }/tests/{ self.get_test_source() }/"
             enhanced_test_suite_path = f"data/{ self.get_project_name() }/tests/{ self.get_test_source() }/enhanced/{ uf.generate_identifier_string(self.identifiers) }/"
@@ -195,7 +195,7 @@ class EvaluationEntry:
 
     def run_optimised_evaluation(self):
         """Run the optimised evaluation on the enhanced test suite."""
-        if self.get_status() == "optimized":
+        if self.get_status() == "optimized" and self.type != "initial":
 
             data_test_path = f"data/{ self.get_project_name() }/tests/{ self.get_test_source() }/optimised/{ uf.generate_identifier_string(self.identifiers) }/"
 
@@ -336,24 +336,24 @@ class EvaluationEntry:
             "no_test_classes_after_repair" : correctnes_data["correctness_eval_counts"]["stats_post_removal"]["no_tests_classes"],
             
             # Repair stats
-            "rule_1_repair_count": total_tests,
-            "rule_2_repair_count": 0,
-            "rule_3_repair_count": len(correctnes_data["repair_stats"]["rule_2"]),
-            "rule_3_repaired_tests": correctnes_data["repair_stats"]["rule_2"],
-            "rule_4_repair_count": len(correctnes_data["repair_stats"]["rule_3"]),
-            "rule_4_repaired_tests": correctnes_data["repair_stats"]["rule_3"],
-            "rule_5_repair_count": len(correctnes_data["repair_stats"]["rule_5"]),
-            "rule_5_repaired_tests": correctnes_data["repair_stats"]["rule_5"],
-            "rule_6_repair_count": len(correctnes_data["repair_stats"]["rule_4"]),
-            "rule_6_repaired_tests": correctnes_data["repair_stats"]["rule_4"],
-            "rule_7_repair_count": len(correctnes_data["repair_stats"]["rule_0"]),
-            "rule_7_repaired_tests": correctnes_data["repair_stats"]["rule_0"],
-            "rule_8_repair_count": len(correctnes_data["repair_stats"]["rule_1"]),
-            "rule_8_repaired_tests": correctnes_data["repair_stats"]["rule_1"],
-            "rule_9_repair_count": len(correctnes_data["repair_stats"]["rule_6"]) if "rule_6" in correctnes_data["repair_stats"] and correctnes_data["repair_stats"]["rule_6"] else 0,
-            "rule_9_repaired_tests": correctnes_data["repair_stats"]["rule_6"] if "rule_6" in correctnes_data["repair_stats"] and correctnes_data["repair_stats"]["rule_6"] else [],
-            "rule_10_repair_count": len(correctnes_data["repair_stats"]["rule_7"]) if "rule_7" in correctnes_data["repair_stats"] and correctnes_data["repair_stats"]["rule_7"] else 0,
-            "rule_10_repaired_tests": correctnes_data["repair_stats"]["rule_7"] if "rule_7" in correctnes_data["repair_stats"] and correctnes_data["repair_stats"]["rule_7"] else [],
+            "rule_0_repair_count": total_tests,
+            "rule_1_repair_count": self.eval_data["corruption_data"]["fixed_corrupted_output"] if "corruption_data" in self.eval_data else 0,
+            "rule_2_repair_count": len(correctnes_data["repair_stats"]["rule_2"]),
+            "rule_2_repaired_tests": correctnes_data["repair_stats"]["rule_2"],
+            "rule_3_repair_count": len(correctnes_data["repair_stats"]["rule_3"]),
+            "rule_3_repaired_tests": correctnes_data["repair_stats"]["rule_3"],
+            "rule_4_repair_count": len(correctnes_data["repair_stats"]["rule_5"]),
+            "rule_4_repaired_tests": correctnes_data["repair_stats"]["rule_5"],
+            "rule_5_repair_count": len(correctnes_data["repair_stats"]["rule_4"]),
+            "rule_5_repaired_tests": correctnes_data["repair_stats"]["rule_4"],
+            "rule_6_repair_count": len(correctnes_data["repair_stats"]["rule_0"]),
+            "rule_6_repaired_tests": correctnes_data["repair_stats"]["rule_0"],
+            "rule_7_repair_count": len(correctnes_data["repair_stats"]["rule_1"]),
+            "rule_7_repaired_tests": correctnes_data["repair_stats"]["rule_1"],
+            "rule_8_repair_count": len(correctnes_data["repair_stats"]["rule_6"]) if "rule_6" in correctnes_data["repair_stats"] and correctnes_data["repair_stats"]["rule_6"] else 0,
+            "rule_8_repaired_tests": correctnes_data["repair_stats"]["rule_6"] if "rule_6" in correctnes_data["repair_stats"] and correctnes_data["repair_stats"]["rule_6"] else [],
+            "rule_9_repair_count": len(correctnes_data["repair_stats"]["rule_7"]) if "rule_7" in correctnes_data["repair_stats"] and correctnes_data["repair_stats"]["rule_7"] else 0,
+            "rule_9_repaired_tests": correctnes_data["repair_stats"]["rule_7"] if "rule_7" in correctnes_data["repair_stats"] and correctnes_data["repair_stats"]["rule_7"] else [],
 
             # Coverage stats
             "coverage" : eval_data_project["coverage"],
@@ -414,7 +414,7 @@ class EvaluationEntry:
                 total_kept_tests = sum([ stats["kept_test_cases"] for stats in optimised_stats["classes"].values() ])
                 total_removed_tests = sum([ stats["removed_test_cases"] for stats in optimised_stats["classes"].values() ])
                 total_skipped_tests = sum([ stats["skipped_test_cases"] for stats in optimised_stats["classes"].values() ])
-                total_faulty_tests = sum([ len(stats["faulty_test_cases"]) for stats in optimised_stats["classes"].values() ])
+                total_faulty_tests = sum([ stats["faulty_test_cases"] if type(stats["faulty_test_cases"]) == int else len(stats["faulty_test_cases"]) for stats in optimised_stats["classes"].values() ])
                 optimised_data["total_tests"] = total_tests
                 optimised_data["total_kept_tests"] = total_kept_tests
                 optimised_data["total_removed_tests"] = total_removed_tests
@@ -467,8 +467,11 @@ class EvaluationEntry:
         return json.dumps(self.to_json())
 
 if __name__ == "__main__":
-    eval_id = "18/pynguin/random_from_all/1"
+    eval_id = "37/chatgpt/random_from_all/3"
     eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
-    eval_entry.status = "evaluated"
-    eval_entry.run_test_suite_optimization()
+    
+    # eval_entry.status = "evaluated"
+    # eval_entry.run_test_suite_optimization()
     # eval_entry.run_optimised_evaluation()
+
+    # eval_entry.redo_evaluation()
