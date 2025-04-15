@@ -14,6 +14,9 @@ This bechmark can be cloned from GitHub using `git clone https://github.com/Fuda
 The pre-processing steps that need to be run (from project root directory):
 1. Extracting the model solutions - `python -m src.python-helper-scripts.extract_classeval_model_solutions`
 2. Extracting the test suite - `python -m src.python-helper-scripts.extract_classeval_tests`
+3. Generating the SBST-generate test suite using pynguin
+    - Start the docker with the pynguin image
+    - Generate the test suite using command - `python src/python-helper-scripts/generate_pynguin_tests.py tmp/classeval data/classeval/tests/pynguin`
 
 
 ## Configuration
