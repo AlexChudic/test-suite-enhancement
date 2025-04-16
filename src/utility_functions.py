@@ -144,6 +144,17 @@ def remove_last_test_case(source_code):
     # Go backwards to find the end of the last test case
     while i >= 0:
         if lines[i].strip().startswith('def test_'):
+
+            if i-1 >= 0 and lines[i-1].strip().startswith(('@', '#')):
+                print("Removing decorator..")
+                i = i-1
+
+            elif i-1 >= 0 and lines[i-1].strip().startswith('])'):
+                print("Removing parameterize decorator..")
+                while i >= 0 and not lines[i].strip() == '' and not lines[i].strip().startswith('@'):
+                    print(f"Removing line {i}: {lines[i]}")
+                    i -= 1
+
             return '\n'.join(lines[:i])
         i -= 1
     
@@ -322,7 +333,7 @@ def choose_fewshot_example_test_cases(selection_mode, test_dir, class_under_test
 
 if __name__ == "__main__":
     # delete_python_files("tmp/human-eval/tests/human-written")
-    copy_python_files("data/human_eval/tests/pynguin", "tmp/human_eval/tests/human_written")
+    copy_python_files("data/human_eval/tests/pynguin/enhanced/pynguin_random_from_all_5", "tmp/human_eval/tests/pynguin")
     # chosen_test_cases = choose_fewshot_example_test_cases("class_similarity_with_definition", "tmp/human_eval/tests/human_written", "HumanEval_5.py", 2)
     # for test_case in chosen_test_cases:
     #     print(test_case)

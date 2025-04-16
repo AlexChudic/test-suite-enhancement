@@ -161,7 +161,6 @@ def remove_empty_class_definition(test_class_path):
             # Collect class body
             while i < len(lines):
                 next_line = lines[i]
-                print("Next line = " + next_line )
                 if next_line.strip() == "":
                     class_block.append(next_line)
                     i += 1
@@ -192,7 +191,7 @@ def get_test_case_by_line(source_code, line_number):
     function_positions = []
 
     for idx, line in enumerate(lines):
-        match = re.match(r'^\s*def\s+(test_\w+)\s*\(', line)
+        match = re.match(r'^\s*def\s+(test_\w+)\s*', line)
         if match:
             function_name = match.group(1)
             function_positions.append((idx + 1, function_name))  # Line numbers are 1-based
@@ -233,6 +232,8 @@ def rule_based_repair(test_case_path, error_msg, test_class, output):
         print("Applying Rule 6: Removing test causing SyntaxError...")
         syntax_error_line = error_msg.lineno
         syntax_error_test_case = get_test_case_by_line(test_class_source_code, syntax_error_line)
+        print("Removing test case: ", syntax_error_test_case)
+
         test_class_source_code = remove_functions(test_case_path, [syntax_error_test_case])
         output["repair_stats"]["rule_6"].append(test_class)
         
@@ -359,8 +360,8 @@ def remove_functions(test_case_path, functions_to_remove, removeLast=False):
         stripped = lines[i].strip()
 
         # Check if the line starts a failed function
-        if any(f"def {fn}(" in stripped for fn in functions_to_remove):
-            fn = re.search(r"def\s+(\w+)\s*\(", stripped).group(1)
+        if any(f"def {fn}" in stripped for fn in functions_to_remove):
+            fn = re.search(r"def\s+(\w+)\s*", stripped).group(1)
             functions_occurance[fn] += 1
 
             # if removeLast -> only remove the last occurance of the function
@@ -375,11 +376,16 @@ def remove_functions(test_case_path, functions_to_remove, removeLast=False):
             leading_spaces = lines[i].index(stripped)
 
             # Remove the function decorator if it exists and is added to new_lines
-            if lines[i-1].strip().startswith(("@", "#")):
-                print(new_lines[len(new_lines)-1].strip())
-                if len(new_lines) > 0 and new_lines[len(new_lines)-1].strip().startswith(("@", "#")):
-                    new_lines.pop()
+            if len(new_lines) > 0 and new_lines[len(new_lines)-1].strip().startswith(("@", "#")):
+                new_lines.pop()
 
+            # Remove the parametrize decorator if it exists and is added to new_lines
+            if len(new_lines) > 0 and new_lines[len(new_lines)-1].strip().startswith("])"):
+                print("Removing the parametrize decorator...")
+                new_lines.pop()
+                while len(new_lines) > 0 and not new_lines[len(new_lines)-1].strip().startswith("@") and not new_lines[len(new_lines)-1].strip() == '':
+                    print(f"Removing the line: {new_lines[len(new_lines)-1]}")
+                    new_lines.pop()
             continue 
 
         # If we're skipping, check if a new function is starting
@@ -411,7 +417,7 @@ def add_correction_evaluation_stats(stats, res):
         return False
     elif res == "No Test Error":
         stats["no_tests_classes"] += 1
-        return True
+        return False
     else:
         parse_res = re.match(r"(\d+) tests passed, (\d+) tests failed, (\d+) tests errored", res)
         if parse_res:
@@ -470,7 +476,7 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
     }
 
     for test_class in test_classes:
-        # if test_class not in ["test_HumanEval_116.py"]:
+        # if test_class not in ["test_HumanEval_91.py"]:
         #     continue
 
         # Evaluate the test class correctness
@@ -706,6 +712,8 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
         # Add the new tests one at a time to see if they improve coverage
         new_test_cases_path = os.path.join(enhanced_test_suite_path, test_class)
         new_test_cases = uf.extract_test_cases_from_file(new_test_cases_path)
+        print("New test cases: ", new_test_cases)
+        print(len(new_test_cases))
         class_stats = {
             "total_test_cases": len(new_test_cases),
             "kept_test_cases": 0,
@@ -778,5 +786,5 @@ if __name__ == "__main__":
     # print(evaluate_functional_correctness("tmp/human_eval/tests/human_written/") )
 
     # get_class_under_test_coverage_metrics("tmp/human_eval/tests/chatgpt/test_HumanEval_107.py")
-    # uf.copy_python_files("data/human_eval/tests/chatgpt/optimised/chatgpt_random_from_all_1", "tmp/human_eval/tests/chatgpt")
+    uf.copy_python_files("data/human_eval/tests/chatgpt/enhanced/chatgpt_problem_similarity_5", "tmp/human_eval/tests/chatgpt")
     pass

@@ -203,15 +203,12 @@ def run_full_pipeline(project_name, test_settings=None):
                         
                         # redo_evaluation is used when we want to re-evaluate the batch request
                         elif eval_entry.status == "redo_evaluation":
-                            eval_data = {
-                                "corruption_data" : batch.get_corrupted_output_data()
-                            }
-                            eval_entry.eval_data = eval_data
+                            eval_entry.eval_data["corruption_data"] = batch.get_corrupted_output_data()
                             eval_entry.status = "initial"
                             eval_entry.run_correctness_evaluation()
                             eval_entry.run_enhanced_evaluation()
-                            eval_entry.run_test_suite_optimization()
-                            eval_entry.run_optimised_evaluation()
+                            eval_entry.status = "finalised"
+                            eval_entry.save()
                         
                         # corrected means that run_correctness_evaluation has been run, but we need to evaluate the enhanced test suite
                         elif eval_entry.status == "corrected":
@@ -222,7 +219,7 @@ def run_full_pipeline(project_name, test_settings=None):
                         elif eval_entry.status == "evaluated":
                             eval_entry.run_test_suite_optimization()
                             eval_entry.run_optimised_evaluation()
-                        elif eval_entry.status == "optimised":
+                        elif eval_entry.status == "optimized":
                             eval_entry.run_optimised_evaluation()
                         else: # eval_entry.status == "finalised":  
                             pass
@@ -251,10 +248,10 @@ if __name__ == "__main__":
     # uf.copy_python_files(data_test_path, tmp_test_path)
 
     eval_ids = [
-    "37/chatgpt/random_from_all/3",
+        "44/chatgpt/problem_similarity/5",
     ]
     # for eval_id in eval_ids:
     #     redo_evaluation('human_eval', eval_id)
-    #     # continue_evaluation(eval_id)
+        # continue_evaluation(eval_id)
 
     # rerun_enhanced_evaluation("human_eval")
