@@ -8,8 +8,9 @@ The project uses the HumanEval and ClassEval benchmarks. If you want to run the 
 This bechmark can be cloned from GitHub using `git clone https://github.com/openai/human-eval.git`
 
 The pre-processing steps that need to be run (from project root directory):
-1. Extracting the model solutions - ``
-2. Extracting the test suite - `python -m src.python-helper-scripts.extract_humaneval_unit_tests`
+1. Import human_eval from the local folder - `pip install -e human-eval`
+1. Extracting the model solutions - `python -m src.python-helper-scripts.extract_humaneval_model_solutions`
+2. Extracting the test suite - `python -m src.python-helper-scripts.extract_humaneval_tests`
 3. Generating the SBST-generate test suite using pynguin
     - Start the docker with the pynguin image
     - Generate the test suite using command - `python src/python-helper-scripts/generate_pynguin_tests.py tmp/human_eval data/human_eval/tests/pynguin`

@@ -1,11 +1,12 @@
 import json
 import re
+import os
 import ast
 import sys
 from pathlib import Path
 from typing import List, Tuple
 
-PATH_TO_JSON = "data/human_eval/human-eval-dataset.jsonl" # Needs to be executed from root directory
+PATH_TO_JSON = "data/human_eval/human-eval-dataset.jsonl"
 OUTPUT_DIR = "data/human_eval/tests/human_written"
 
 def process_json(file_path=PATH_TO_JSON):
@@ -15,9 +16,6 @@ def process_json(file_path=PATH_TO_JSON):
     with open(file_path, "r") as f:
         for line_number, line in enumerate(f, start=1):
             try:
-                # if line_number not in [152, 73, 114]:
-                #     continue
-                
                 # Parse each line as a JSON object
                 data = json.loads(line.strip())
                 
@@ -136,4 +134,5 @@ def create_function_for_each_assert(test_str):
 
 
 if __name__ == "__main__":
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
     process_json()
