@@ -1,4 +1,4 @@
-# test-suite-enhancement
+# Automated Test Suite Enhancement Using Large Language Models With Few-shot Prompting
 Level 5 Project on Test Suite Enhancement using LLMs
 
 ### Supervisor: Handan Gul Calikli
