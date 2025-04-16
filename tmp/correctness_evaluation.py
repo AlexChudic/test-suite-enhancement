@@ -191,7 +191,7 @@ def get_test_case_by_line(source_code, line_number):
     function_positions = []
 
     for idx, line in enumerate(lines):
-        match = re.match(r'^\s*def\s+(test_\w+)\s*', line)
+        match = re.match(r'^\s*def\s+(test_\w+)\s*\(', line)
         if match:
             function_name = match.group(1)
             function_positions.append((idx + 1, function_name))  # Line numbers are 1-based
@@ -330,7 +330,7 @@ def remove_failing_tests(test_case_path, res, test_class, output):
         output["repair_stats"]["removed_tests_error"].append((test_class, len(error_tests)))
 
     failing_tests += error_tests
-    print(failing_tests)
+    print("Failing functions to be removed: ", failing_tests)
     remove_functions(test_case_path, failing_tests)
     
 
@@ -360,8 +360,8 @@ def remove_functions(test_case_path, functions_to_remove, removeLast=False):
         stripped = lines[i].strip()
 
         # Check if the line starts a failed function
-        if any(f"def {fn}" in stripped for fn in functions_to_remove):
-            fn = re.search(r"def\s+(\w+)\s*", stripped).group(1)
+        if any(f"def {fn}(" in stripped for fn in functions_to_remove):
+            fn = re.search(r"def\s+(\w+)\s*\(", stripped).group(1)
             functions_occurance[fn] += 1
 
             # if removeLast -> only remove the last occurance of the function
@@ -690,7 +690,7 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
         "classes": {},
     }
     for test_class in test_classes:
-        # if test_class not in ["test_HumanEval_108.py", "test_HumanEval_112.py"]:
+        # if test_class not in ["test_HumanEval_54.py", "test_HumanEval_111.py"]:
         #     continue
         # Get existing coverage metrics
         test_class_path = os.path.join(exising_test_suite_path, test_class)
@@ -712,8 +712,6 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
         # Add the new tests one at a time to see if they improve coverage
         new_test_cases_path = os.path.join(enhanced_test_suite_path, test_class)
         new_test_cases = uf.extract_test_cases_from_file(new_test_cases_path)
-        print("New test cases: ", new_test_cases)
-        print(len(new_test_cases))
         class_stats = {
             "total_test_cases": len(new_test_cases),
             "kept_test_cases": 0,

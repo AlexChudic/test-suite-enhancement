@@ -118,12 +118,6 @@ def extract_test_cases_from_file(file_path):
         if isinstance(node, ast.FunctionDef) and node.name.startswith("test_"):
             test_cases.append(get_source_segment(node))
 
-        # Extract test methods inside classes
-        elif isinstance(node, ast.ClassDef):
-            for sub_node in node.body:
-                if isinstance(sub_node, ast.FunctionDef) and sub_node.name.startswith("test_"):
-                    test_cases.append(get_source_segment(sub_node))
-
     # if the test case is tabulated, remove the tabs
     untabulated_test_cases = []
     for test_case in test_cases:
