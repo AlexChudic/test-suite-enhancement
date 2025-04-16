@@ -162,12 +162,14 @@ class BatchRequest:
 
     def create_batch_jsonl_file(self, batch_requests_dir=BATCH_REQUESTS_DIR):
         """Generate a batch JSONL file with prompts from the input dataset."""
-        dataset_data_path = self.dataset_path.split('/')
-        dataset_data_path[0] = "data"
-        dataset_data_path = "/".join(dataset_data_path)
-        uf.copy_python_files(dataset_data_path, self.dataset_path)
+        if self.identifiers["job_type"] == "fewshot_test_suite_enhancement":
+            dataset_data_path = self.dataset_path.split('/')
+            dataset_data_path[0] = "data"
+            dataset_data_path = "/".join(dataset_data_path)
+            uf.copy_python_files(dataset_data_path, self.dataset_path)
 
         python_files = [f for f in os.listdir(self.dataset_path) if f.endswith(".py")]
+
         tasks = []
 
         system_prompt = self.get_system_prompt()
@@ -198,8 +200,9 @@ class BatchRequest:
                 file.write(json.dumps(task) + "\n")
         self.task_json = batch_json_path
 
-        uf.delete_python_files(self.dataset_path)
-        uf.delete_repository(self.dataset_path)
+        if self.identifiers["job_type"] == "fewshot_test_suite_enhancement":
+            uf.delete_python_files(self.dataset_path)
+            uf.delete_repository(self.dataset_path)
 
         print("The batch JSONL file has been successfully created.")
 

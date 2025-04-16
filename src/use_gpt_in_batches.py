@@ -15,13 +15,6 @@ load_dotenv(override=True)
 # Initialize a connection to the OpenAI API
 client = OpenAI()
 
-# Define the prompt for generating initial unit test cases
-generate_initial_unit_tests_system_prompt = '''
-Your goal is to generate unit tests for a python class using the pytest framework. You will be provided with the class definition, and you will output a list of unit test.
-The unit tests should cover the most important methods of the class, reaching a minimum of 80% code coverage.
-Make sure to keep the tests simple and easy to understand. The output should only include the test classes.
-'''
-
 generate_new_test_cases_system_prompt = '''
 Your goal is to generate new unit tests for a python class using the pytest framework. You will be provided with the class definition, example unit tests, and you will output a list of new unit test.
 Try to draw inspiration from the example unit tests and create new test cases that cover different aspects of the class functionality.

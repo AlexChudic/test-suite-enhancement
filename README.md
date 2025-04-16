@@ -5,7 +5,18 @@ Level 5 Project on Test Suite Enhancement using LLMs
 The project uses the HumanEval and ClassEval benchmarks. If you want to run the code, you'll need to clone them first and run the pre-processing steps used to get them into the format that is used for evaluation.
 
 ### HumanEval
-This 
+This bechmark can be cloned from GitHub using `git clone https://github.com/openai/human-eval.git`
+
+The pre-processing steps that need to be run (from project root directory):
+1. Extracting the model solutions - ``
+2. Extracting the test suite - `python -m src.python-helper-scripts.extract_humaneval_unit_tests`
+3. Generating the SBST-generate test suite using pynguin
+    - Start the docker with the pynguin image
+    - Generate the test suite using command - `python src/python-helper-scripts/generate_pynguin_tests.py tmp/human_eval data/human_eval/tests/pynguin`
+4. Generating the LLM-based test suite
+    - Submit the batch request using command - `python -m src.python-helper-scripts.generate_LLM_tests human_eval`
+    - Wait until the batch is processed
+    - Collect the results using the same command
 
 
 ### ClassEval
@@ -17,6 +28,10 @@ The pre-processing steps that need to be run (from project root directory):
 3. Generating the SBST-generate test suite using pynguin
     - Start the docker with the pynguin image
     - Generate the test suite using command - `python src/python-helper-scripts/generate_pynguin_tests.py tmp/classeval data/classeval/tests/pynguin`
+4. Generating the LLM-based test suite
+    - Submit the batch request using command - `python -m src.python-helper-scripts.generate_LLM_tests classeval`
+    - Wait until the batch is processed
+    - Collect the results using the same command
 
 
 ## Configuration
