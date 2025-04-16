@@ -27,10 +27,15 @@ def ensure_initial_test_suite_correctness(project_name, test_source):
     
     return res
 
-def run_initial_project_evaluations(project_name):
+
+def run_initial_project_evaluations(project_name, redo=False):
     print(f"Running initial evaluations for project: {project_name}\n")
     
     for test_source in ["human_written", "pynguin", "chatgpt"]:
+        if EvaluationEntry.get_eval_entry_by_test_source(test_source, "initial", project_name) and not redo:
+            print(f"Evaluation entry already exists for {test_source}. Skipping initial evaluation.")
+            continue
+
         eval_metrics = {}
         
         # Get the correctness metrics from the json file
@@ -74,6 +79,9 @@ def run_initial_project_evaluations(project_name):
             eval_data=eval_metrics,
             status="evaluated"
         )
+        eval_entry.save()
+        print(f"Initial evaluation for {test_source} completed.\n")
+
 
 def rerun_enhanced_evaluation(project_name, eval_id=None):
     eval_entries = EvaluationEntry.load_all("enhanced", project_name)
@@ -114,18 +122,6 @@ def redo_evaluation(project_name, eval_id):
         "num_test_cases": eval_entry.identifiers["num_test_cases"]
     }
     run_full_pipeline(project_name, test_settings=settings)
-
-def continue_evaluation(eval_id):
-    eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
-
-    # initial means that the batch request is not evaluated yet
-    if eval_entry.status == "initial":
-        eval_entry.run_correctness_evaluation()
-        eval_entry.run_enhanced_evaluation()
-        
-    # corrected means that run_correctness_evaluation has been run, but we need to evaluate the enhanced test suite
-    elif eval_entry.status == "corrected":
-        eval_entry.run_enhanced_evaluation()
 
 
 def run_full_pipeline(project_name, test_settings=None):
@@ -238,20 +234,49 @@ def run_full_pipeline(project_name, test_settings=None):
                         
 
 if __name__ == "__main__":
-    # ensure_initial_test_suite_correctness("human_eval", "pynguin")
-    # run_initial_project_evaluations("human_eval")
 
-    run_full_pipeline("human_eval")
+    if len(sys.argv) == 3:
+        project_name = sys.argv[1]     
+        command = sys.argv[2]
 
-    # data_test_path = f"data/human_eval/tests/human_written/enhanced/human_written_random_from_all_5/"
-    # tmp_test_path = f"tmp/human_eval/tests/human_written/"
-    # uf.copy_python_files(data_test_path, tmp_test_path)
+        if command not in ["initial_correctness", "run_full_pipeline"]:
+            print("Invalid command. Use 'initial_correctness' or 'run_full_pipeline'.")
+            sys.exit(1)
 
-    eval_ids = [
-        "44/chatgpt/problem_similarity/5",
-    ]
-    # for eval_id in eval_ids:
-    #     redo_evaluation('human_eval', eval_id)
-        # continue_evaluation(eval_id)
+        elif command == "initial_evaluation":
+            for test_source in ["human_written", "pynguin", "chatgpt"]:
+                ensure_initial_test_suite_correctness(project_name, test_source)
 
-    # rerun_enhanced_evaluation("human_eval")
+            # Run the initial project evaluations
+            run_initial_project_evaluations(project_name)
+
+        elif command == "run_full_pipeline":
+            # Ensure the initial test suite is correct - if not, apply rule-based repair
+            for test_source in ["human_written", "pynguin", "chatgpt"]:
+                if not os.path.exists(f"data/{project_name}/tests/{test_source}/correctness_evaluation.json"):
+                    print(f"Correctness metrics file not found for {test_source}. Running initial correctness evaluation..")
+                    ensure_initial_test_suite_correctness(project_name, test_source)
+
+            # Run the full pipeline for the project
+            run_full_pipeline(project_name)
+
+    elif len(sys.argv) != 1:
+        print("Usage: python script.py <project_name> <command>")
+        print("Commands: initial_correctness, run_full_pipeline")
+        sys.exit(1)
+
+    else:
+        run_full_pipeline("human_eval")
+
+        # data_test_path = f"data/human_eval/tests/human_written/enhanced/human_written_random_from_all_5/"
+        # tmp_test_path = f"tmp/human_eval/tests/human_written/"
+        # uf.copy_python_files(data_test_path, tmp_test_path)
+
+        eval_ids = [
+            "23/pynguin/random_from_class_under_test/5",
+        ]
+        # for eval_id in eval_ids:
+        #     redo_evaluation('human_eval', eval_id)
+            # continue_evaluation(eval_id)
+
+        # rerun_enhanced_evaluation("human_eval")
