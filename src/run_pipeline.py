@@ -236,7 +236,7 @@ def run_full_pipeline(project_name, test_settings=None):
 if __name__ == "__main__":
 
     if len(sys.argv) == 3:
-        project_name = sys.argv[1]     
+        project_name = sys.argv[1]
         command = sys.argv[2]
 
         if command not in ["initial_correctness", "run_full_pipeline"]:
