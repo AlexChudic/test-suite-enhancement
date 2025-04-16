@@ -8,9 +8,8 @@ Level 5 Project on Test Suite Enhancement using LLMs
 TODO: add abstract
 
 ## Environment Configuration
-To setup the environment and install the dependencies follow the steps below:
 
-## Virtual Environment Setup (Optional)
+### Virtual Environment Setup (Optional)
 
 1. Create a virtual environment (only run once) `python -m venv venv`
 2. Activate the environment
