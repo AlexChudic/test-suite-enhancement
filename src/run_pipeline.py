@@ -6,6 +6,7 @@ from src.evaluation_entry import EvaluationEntry
 import tmp.correctness_evaluation as correctness_evaluation
 import json
 import os
+import sys
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -32,7 +33,7 @@ def run_initial_project_evaluations(project_name, redo=False):
     print(f"Running initial evaluations for project: {project_name}\n")
     
     for test_source in ["human_written", "pynguin", "chatgpt"]:
-        if EvaluationEntry.get_eval_entry_by_test_source(test_source, "initial", project_name) and not redo:
+        if EvaluationEntry.get_initial_eval_entry_by_test_source(test_source, project_name) and not redo:
             print(f"Evaluation entry already exists for {test_source}. Skipping initial evaluation.")
             continue
 
@@ -239,13 +240,15 @@ if __name__ == "__main__":
         project_name = sys.argv[1]
         command = sys.argv[2]
 
-        if command not in ["initial_correctness", "run_full_pipeline"]:
+        if command not in ["initial_evaluation", "run_full_pipeline"]:
             print("Invalid command. Use 'initial_correctness' or 'run_full_pipeline'.")
             sys.exit(1)
 
         elif command == "initial_evaluation":
-            for test_source in ["human_written", "pynguin", "chatgpt"]:
-                ensure_initial_test_suite_correctness(project_name, test_source)
+            for test_source in ["human_written", "pynguin"]:#, "chatgpt"]:
+                if not os.path.exists(f"data/{project_name}/tests/{test_source}/correctness_evaluation.json"):
+                    print(f"Correctness metrics file not found for {test_source}. Running initial correctness evaluation..")
+                    ensure_initial_test_suite_correctness(project_name, test_source)
 
             # Run the initial project evaluations
             run_initial_project_evaluations(project_name)
@@ -256,6 +259,9 @@ if __name__ == "__main__":
                 if not os.path.exists(f"data/{project_name}/tests/{test_source}/correctness_evaluation.json"):
                     print(f"Correctness metrics file not found for {test_source}. Running initial correctness evaluation..")
                     ensure_initial_test_suite_correctness(project_name, test_source)
+
+            # Run the initial project evaluations
+            run_initial_project_evaluations(project_name)
 
             # Run the full pipeline for the project
             run_full_pipeline(project_name)

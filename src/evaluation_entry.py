@@ -77,6 +77,20 @@ class EvaluationEntry:
                 return entry
         else:
             return None
+        
+    @classmethod
+    def get_initial_eval_entry_by_test_source(cls, test_source, project_name):
+        """Check if an evaluation entry exists."""
+        path = cls.get_type_json_path("initial", project_name)
+        if not os.path.exists(path):
+            return None
+        
+        eval_entries = cls.load_all("initial", project_name)
+        for entry in eval_entries:
+            if entry.identifiers["test_source"] == test_source:
+                return entry
+        else:
+            return None
     
     @classmethod
     def load_all(cls, type, project_name):
@@ -467,11 +481,14 @@ class EvaluationEntry:
         return json.dumps(self.to_json())
 
 if __name__ == "__main__":
-    eval_id = "37/chatgpt/random_from_all/3"
-    eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
+    eval_id = "44/chatgpt/problem_similarity/5"
+    # 26/pynguin/problem_similarity/5 44/chatgpt/problem_similarity/5
+    # eval_entry = EvaluationEntry.get_eval_entry_by_eval_id(eval_id, "enhanced", "human_eval")
     
     # eval_entry.status = "evaluated"
     # eval_entry.run_test_suite_optimization()
     # eval_entry.run_optimised_evaluation()
 
     # eval_entry.redo_evaluation()
+
+    # uf.copy_python_files("data/human_eval/tests/chatgpt/enhanced/chatgpt_problem_similarity_5", "tmp/human_eval/tests/chatgpt")
