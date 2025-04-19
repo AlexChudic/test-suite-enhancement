@@ -212,4 +212,4 @@ def get_execution_duration():
 
 
 if __name__ == "__main__":
-    evaluate_project_directory("human_eval")
+    evaluate_project_directory("classeval")

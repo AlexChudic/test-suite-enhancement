@@ -33,13 +33,7 @@ def finalize_pytest_conversion(directory):
         # 1. Replace unittest imports with pytest
         content = content.replace('import unittest', 'import pytest')
         
-        # 2. Add import for module under test (based on original filename)
-        module_name = test_file.stem[5:]  # Remove 'test_' prefix
-        import_line = f'from {module_name} import {module_name}'
-        if import_line not in content:
-            content = f"{import_line}\n{content}"
-        
-        # 3. Process test classes
+        # 2. Process test classes
         def replace_class(match):
             class_name = ensure_test_class_prefix(match.group(1))
             base_class = match.group(2)
@@ -54,7 +48,7 @@ def finalize_pytest_conversion(directory):
             content
         )
 
-        # 4. Convert the setUp method to a pytest fixture
+        # 3. Convert the setUp method to a pytest fixture
         def replace_setUp_class(match):
             setup_str = match.group(1)
             setup_line = setup_str.split('\n')[-1]
@@ -68,7 +62,7 @@ def finalize_pytest_conversion(directory):
             flags=re.MULTILINE
         )
 
-        # 5. Include the import statments from problem definition in the test file
+        # 4. Include the import statments from problem definition in the test file
         class_under_test_path = os.path.join("/".join(directory.split("/")[:-2]), test_file.stem[5:] + ".py")
         problem_imports = find_definition_imports(class_under_test_path)
         if problem_imports:
@@ -127,40 +121,40 @@ if __name__ == "__main__":
     tmp_directory = "tmp/classeval/tests/human_written2"
     output_directory = "data/classeval/tests/human_written2"
 
-    # # Copy the Python files from the input directory to the output directory
-    # os.makedirs(tmp_directory, exist_ok=True)
-    # uf.copy_python_files(input_directory, tmp_directory)
+    # Copy the Python files from the input directory to the output directory
+    os.makedirs(tmp_directory, exist_ok=True)
+    uf.copy_python_files(input_directory, tmp_directory)
 
-    # # Remove the DocFileHandler.py file from the output directory -> the import it uses is not available
-    # os.remove(f"{tmp_directory}/DocFileHandler.py")
+    # Remove the DocFileHandler.py file from the output directory -> the import it uses is not available
+    os.remove(f"{tmp_directory}/DocFileHandler.py")
     
-    # try:
-    #     subprocess.run(
-    #         ["unittest2pytest", "-w", str(tmp_directory)],
-    #         check=True,
-    #         capture_output=True,
-    #         text=True
-    #     )
-    #     print(f"Successfully converted unittest files in: {tmp_directory}")
+    try:
+        subprocess.run(
+            ["unittest2pytest", "-w", str(tmp_directory)],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        print(f"Successfully converted unittest files in: {tmp_directory}")
 
-    # except subprocess.CalledProcessError as e:
-    #     print(f"Conversion failed with error:\n{e.stderr}")
-    #     raise
-    # except FileNotFoundError:
-    #     raise RuntimeError(
-    #         "unittest2pytest not found. Install it with: pip install unittest2pytest"
-    #     )
+    except subprocess.CalledProcessError as e:
+        print(f"Conversion failed with error:\n{e.stderr}")
+        raise
+    except FileNotFoundError:
+        raise RuntimeError(
+            "unittest2pytest not found. Install it with: pip install unittest2pytest"
+        )
     
-    # # Delete backup files created by unittest2pytest
-    # delete_backup_files(tmp_directory)
+    # Delete backup files created by unittest2pytest
+    delete_backup_files(tmp_directory)
 
-    # # Convert the test files into pytest format
-    # convert_test_files(tmp_directory)
+    # Convert the test files into pytest format
+    convert_test_files(tmp_directory)
 
-    # # Move the converted test files to the output directory and cleanup
-    # os.makedirs(output_directory, exist_ok=True)
-    # uf.copy_python_files(tmp_directory, output_directory)
-    # uf.delete_repository(tmp_directory)
+    # Move the converted test files to the output directory and cleanup
+    os.makedirs(output_directory, exist_ok=True)
+    uf.copy_python_files(tmp_directory, output_directory)
+    uf.delete_repository(tmp_directory)
 
-    uf.copy_python_files(output_directory, tmp_directory)
+    # uf.copy_python_files(output_directory, tmp_directory)
 

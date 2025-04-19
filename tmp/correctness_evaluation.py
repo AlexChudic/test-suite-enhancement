@@ -56,6 +56,7 @@ def check_correctness(test_case_path):
         
 
 def extract_function_name(test_path, module_name):
+    """Extracts function names from the module source code."""
     module_path = "/".join(test_path.split("/")[:-3]) + "/" + module_name + ".py"
     if not os.path.exists(module_path):
         raise FileNotFoundError(f"Target file not found: {module_path}")
@@ -273,10 +274,15 @@ def rule_based_repair(test_case_path, error_msg, test_class, output):
     # RULE 3: Add missing module import statement
     module_import = f"from {module_name} import {', '.join(function_names)}"
     pynguin_import = f"import {module_name} as module_0"
-    print("Module import: ", module_import)
-    if module_import not in test_class_source_code and function_names != [] and pynguin_import not in test_class_source_code:
+    cut_import = f"from {module_name} import {module_name}"
+    if module_import not in test_class_source_code and pynguin_import not in test_class_source_code and cut_import not in test_class_source_code:
         print("Applying Rule 3: Adding missing module import statement...")
-        test_class_source_code = module_import + "\n" + test_class_source_code
+        project_name = test_case_path.split("/")[1]
+        if project_name == "classeval":
+            test_class_source_code = cut_import + "\n" + test_class_source_code
+        else:
+            if function_names != []:
+                test_class_source_code = module_import + "\n" + test_class_source_code
         output["repair_stats"]["rule_3"].append(test_class)
 
     # RULE 4: Remove self argument from standalone test functions
@@ -431,20 +437,9 @@ def add_correction_evaluation_stats(stats, res):
                 return False
         else:
             return False
-
-
-def cleanup_no_unit_test_class(test_class_path):
-    with open(test_class_path, "r", encoding="utf-8") as f:
-        source_code = f.read()
-    if "class" in source_code:
-        # CLEANUP: Remove the class definition
-        source_code = re.sub(r"class\s+\w+\s*:\s*", "", source_code)
-
-    with open(test_class_path, "w", encoding="utf-8") as f:
-        f.write(source_code)
     
 
-def evaluate_functional_correctness(path, effectiveness_optimization=False, enhanced_test_suite_path=None):
+def evaluate_functional_correctness(path):
     test_classes = [f for f in os.listdir(path) if f.endswith(".py")]
     stats_pre_repair = {
         "total_classes": 0,
@@ -503,19 +498,9 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
                 remove_failing_tests(test_class_path, res, test_class, output)
                 remove_empty_class_definition(test_class_path)
 
-                # class_test_cases = uf.extract_test_cases_from_file(test_class_path)
-                # if len(class_test_cases) == 0:
-                #     cleanup_no_unit_test_class(class_test_cases)
-
         # Evaluate the test class correctness again
         res = check_correctness(test_class_path)
         add_correction_evaluation_stats(stats_post_removal, res[0])
-        
-        # Optimize the test suite effectiveness - ONLY works in tmp directory
-        if effectiveness_optimization and enhanced_test_suite_path:
-            enhanced_test_case_path = os.path.join(enhanced_test_suite_path, test_class) 
-            optimise_test_suite_effectiveness(test_class_path, enhanced_test_case_path, test_class, output)
-    
 
     print("Functional Correctness Evaluation Results PRE:")
     print(json.dumps(stats_pre_repair, indent=4))
@@ -526,15 +511,10 @@ def evaluate_functional_correctness(path, effectiveness_optimization=False, enha
     print("Functional Correctness Evaluation Results POST REMOVAL:")
     print(json.dumps(stats_post_removal, indent=4))
 
-    if effectiveness_optimization:
-        print("Effectiveness Optimization Results:")
-        # TODO: Print effectiveness optimization results
-
     output["correctness_eval_counts"] = {
         "stats_pre_repair" : stats_pre_repair,
         "stats_post_repair" : stats_post_repair, 
         "stats_post_removal" : stats_post_removal,
-        # TODO: Add effectiveness optimization results
     }
 
     return output
@@ -574,6 +554,7 @@ def remove_new_test_case(new_test_case, test_class_path):
     
     with open(test_class_path, "w", encoding="utf-8") as f:
         f.write(test_class_source_code)
+
 
 def adjust_new_test_case(new_test_case, test_class_path):
     """Adjusts the new test case to match the existing test case format."""
@@ -618,6 +599,7 @@ def adjust_new_test_case(new_test_case, test_class_path):
         new_test_case = re.sub(pattern, add_module_prefix, new_test_case)
 
     return new_test_case
+
 
 def get_class_under_test_coverage_metrics(test_case_path):
     """Returns the class under test coverage."""
@@ -781,8 +763,8 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
 
 if __name__ == "__main__":
     # print("CORRECTNESS EVALUATION RESULTS:")
-    # print(evaluate_functional_correctness("tmp/human_eval/tests/human_written/") )
+    print(evaluate_functional_correctness("tmp/classeval/tests/human_written/") )
 
     # get_class_under_test_coverage_metrics("tmp/human_eval/tests/chatgpt/test_HumanEval_107.py")
-    uf.copy_python_files("data/human_eval/tests/chatgpt/enhanced/chatgpt_problem_similarity_5", "tmp/human_eval/tests/chatgpt")
+    # uf.copy_python_files("data/classeval/tests/pynguin/initial/", "tmp/classeval/tests/pynguin/")
     pass
