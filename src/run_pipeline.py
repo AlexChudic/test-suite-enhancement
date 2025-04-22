@@ -50,6 +50,11 @@ def run_initial_project_evaluations(project_name, redo=False):
             correctness_metrics = json.load(file)
             eval_metrics["correctness_evaluation"] = correctness_metrics
 
+        initial_eval_entry = EvaluationEntry.get_initial_eval_entry_by_test_source(test_source, project_name)
+        if initial_eval_entry:
+            print(f"Initial evaluation entry already exists for {test_source}. Skipping initial evaluation.")
+            continue
+
         # Perform the test suite evaluation
         print(f"Running initial evaluations for project: {project_name} with test source: {test_source}\n")
         uf.copy_python_files(f"data/{project_name}/tests/{test_source}", f"tmp/{project_name}/tests/{test_source}")
@@ -137,7 +142,7 @@ def run_full_pipeline(project_name, test_settings=None):
         sources = ["human_written", "pynguin", "chatgpt"]
         example_selection_modes = ["random_from_all", "random_from_class_under_test", "problem_similarity", "class_similarity_no_definition", 
                                 "class_similarity_with_definition", "problem_and_class_similarity"]
-        num_test_cases = [1, 3, 5]
+        num_test_cases = [5]#[1, 3, 5]
 
     for test_source in sources:
         
@@ -166,11 +171,11 @@ def run_full_pipeline(project_name, test_settings=None):
                         client,
                         identifiers
                     )
-                    new_batch_request.continue_processing(submit_job=False) # Change to True when everything is ready!
+                    new_batch_request.continue_processing(submit_job=False)
                     batch_requests.append(new_batch_request)
                     use_gpt.save_batch_requests(batch_requests)
                 else:
-                    batch.continue_processing(submit_job=True)
+                    batch.continue_processing(submit_job=True) # Change to True when everything is ready!
                     batch_status = batch.check_status()
                     
                     # If the batch is completed, continue processing - extract the results
@@ -245,7 +250,7 @@ if __name__ == "__main__":
             sys.exit(1)
 
         elif command == "initial_evaluation":
-            for test_source in ["human_written", "pynguin"]:#, "chatgpt"]:
+            for test_source in ["human_written", "pynguin", "chatgpt"]:
                 if not os.path.exists(f"data/{project_name}/tests/{test_source}/correctness_evaluation.json"):
                     print(f"Correctness metrics file not found for {test_source}. Running initial correctness evaluation..")
                     ensure_initial_test_suite_correctness(project_name, test_source)

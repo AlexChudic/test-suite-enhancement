@@ -64,9 +64,15 @@ def extract_function_name(test_path, module_name):
         with open(module_path, "r", encoding="utf-8") as f:
             module_source_code = f.read()
         
+        # Match function definitions
         pattern = r'^def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\('
-        matches = re.findall(pattern, module_source_code, re.MULTILINE)
-        return matches
+        function_matches = re.findall(pattern, module_source_code, re.MULTILINE)
+
+        # Match class definitions
+        pattern = r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\:|\('
+        class_matches = re.findall(pattern, module_source_code, re.MULTILINE)
+        class_matches = [match for match in class_matches if match != ""]
+        return function_matches + class_matches
 
 
 def add_missing_function_names(test_class_source_code):
@@ -584,6 +590,9 @@ def adjust_new_test_case(new_test_case, test_class_path):
         
         new_test_case = re.sub(match, replacer, new_test_case, count=1)
 
+        # Also remove the self function call
+        new_test_case = re.sub(r"self\.", "", new_test_case)
+
     # Handle pynguin imports (module_0)
     module_name = os.path.basename(test_class_path).replace(".py", "").removeprefix("test_")
     pynguin_import = f"import {module_name} as module_0"
@@ -591,12 +600,15 @@ def adjust_new_test_case(new_test_case, test_class_path):
         # Add the module_0. prefix to everywhere the function from module_0 is used
         print("Adding module_0 prefix to function names if needed")
         function_names = extract_function_name(test_class_path, module_name)
-        pattern = r'(?<!module_0\.)\b(' + '|'.join(map(re.escape, function_names)) + r')\b'
+        print("Function names: ")
+        print(function_names)
+        if(function_names != []):
+            pattern = r'(?<!module_0\.)\b(' + '|'.join(map(re.escape, function_names)) + r')\b'
 
-        def add_module_prefix(match):
-            return f'module_0.{match.group(1)}'
-        
-        new_test_case = re.sub(pattern, add_module_prefix, new_test_case)
+            def add_module_prefix(match):
+                return f'module_0.{match.group(1)}'
+            
+            new_test_case = re.sub(pattern, add_module_prefix, new_test_case)
 
     return new_test_case
 
@@ -672,7 +684,7 @@ def optimise_test_suite_effectiveness(exising_test_suite_path, enhanced_test_sui
         "classes": {},
     }
     for test_class in test_classes:
-        # if test_class not in ["test_HumanEval_54.py", "test_HumanEval_111.py"]:
+        # if test_class not in ["test_DataStatistics4.py"]:
         #     continue
         # Get existing coverage metrics
         test_class_path = os.path.join(exising_test_suite_path, test_class)
