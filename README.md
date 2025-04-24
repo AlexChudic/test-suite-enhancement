@@ -3,10 +3,6 @@ Level 5 Project on Test Suite Enhancement using LLMs
 
 ### Supervisor: Handan Gul Calikli
 
-### Abstract
-
-TODO: add abstract
-
 ## Environment Configuration
 
 ### Virtual Environment Setup (Optional)
