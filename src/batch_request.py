@@ -12,12 +12,6 @@ The prompt will include EXAMPLES of similar test cases to help you generate well
 Make sure to keep the tests maintainable and easy to understand, while aiming for high code coverage. The output should only include the test classes.
 '''
 
-generate_new_test_cases_system_prompt_final_same_class_examples = '''
-You are an expert in Python test generation using pytest. Your goal is to generate new high-quality unit tests for a given Python class. You will be provided with the class definition and your output should be a list of new unit tests.
-The prompt will include EXAMPLES of existing test classes to help you expand the test suite with well-structured test cases. 
-Make sure to keep the tests maintainable and easy to understand, while aiming for high code coverage. The output should only include the test classes.
-'''
-
 class BatchRequest:
 
     def __init__(self, output_path, dataset_path, system_prompt=None, client=None, identifiers={}, batch_id=None, status="initial",
