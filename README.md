@@ -6,7 +6,7 @@ This is the artifacts package for the paper "Automated Test Suite Enhancement Us
 
 It contains three main directories:
 1. **data/**: This folder contains the following subfolders
-    - **figures/**: The figures summarize the results of the analysis conducted to determine the optimal number of test examples to include in the prompts for HumanEval
+    - **figures/**: The figures summarize the results of the analysis conducted to determine the optimal number of test examples to include in the prompts for HumanEval (`rq0_code_quality_for_no_of_test_examples.png`, `rq0_correctness_for_no_of_test_examples.png`, `rq0_coverage_for_no_of_test_examples.png`). This subfolder also contains the distribution of classes that got fixed with respect to the employed repair rules for HumanEval and ClassEval
     - **batch_requests/**:
         - **batch_task_jsons/**: This folder contains all of the batch inputs
         - **batch_results_jsons/**: This folder contains all of the outputs from the LLM
