@@ -1,5 +1,7 @@
 # Automated Test Suite Enhancement Using Large Language Models With Few-shot Prompting
 
+This is the artifacts package for the paper "Automated Test Suite Enhancement Using Large Language Models With Few-shot Prompting".
+
 ## Environment Configuration
 
 ### Virtual Environment Setup (Optional)

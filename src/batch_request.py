@@ -376,8 +376,6 @@ class BatchRequest:
     def get_system_prompt(self):
         if self.system_prompt:
             return self.system_prompt
-        elif "test_selection_mode" in self.identifiers and self.identifiers["test_selection_mode"] == "random_from_class_under_test":
-            return generate_new_test_cases_system_prompt_final_same_class_examples
         else:
             return generate_new_test_cases_system_prompt_final
 
